@@ -1,0 +1,431 @@
+# pip install pyTelegramBotAPI
+
+import telebot
+from telebot import types
+import time
+import threading
+
+TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
+
+bot = telebot.TeleBot(TOKEN)
+
+# Хранилище пользователей
+users = {}
+
+# Данные профилей
+profiles = {}
+
+# Проверка первого входа
+def is_new_user(user_id):
+    return user_id not in users
+
+
+# Удаление предыдущего сообщения
+def delete_previous(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+
+
+# Главное меню
+def send_main_menu(chat_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    btn1 = types.InlineKeyboardButton("Получить APPLE ID", callback_data="apple")
+
+    btn2 = types.InlineKeyboardButton("Мой профиль", callback_data="profile")
+    btn3 = types.InlineKeyboardButton("Настройки", callback_data="settings")
+
+    btn4 = types.InlineKeyboardButton("О проекте", callback_data="about")
+
+    markup.add(btn1)
+    markup.row(btn2, btn3)
+    markup.add(btn4)
+
+    bot.send_message(chat_id, "Добро пожаловать!", reply_markup=markup)
+
+
+# START
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+
+    if is_new_user(user_id):
+
+        users[user_id] = {
+            "source": "",
+            "experience": "",
+            "time": "",
+            "mode": "От 11"
+        }
+
+        profiles[user_id] = {
+            "cash": 0,
+            "profits": 0,
+            "locks": 0
+        }
+
+        markup = types.InlineKeyboardMarkup()
+        btn = types.InlineKeyboardButton(
+            "Подать заявку",
+            callback_data="apply"
+        )
+        markup.add(btn)
+
+        bot.send_message(
+            message.chat.id,
+            "Добро пожаловать в UDD team!\nДля начала подай заявку.",
+            reply_markup=markup
+        )
+
+    else:
+        send_main_menu(message.chat.id)
+
+
+# Подать заявку
+@bot.callback_query_handler(func=lambda call: call.data == "apply")
+def apply(call):
+    delete_previous(call)
+
+    markup = types.InlineKeyboardMarkup()
+    btn = types.InlineKeyboardButton("Дальше", callback_data="next_rules")
+    markup.add(btn)
+
+    text = (
+        "UDD - Порядок и усилия.\n\n"
+        "Мы создали комфортную среду для работы и общения. "
+        "Чтобы еe сохранить - соблюдайте этические нормы общества."
+    )
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Вопрос 1
+@bot.callback_query_handler(func=lambda call: call.data == "next_rules")
+def ask_source(call):
+    delete_previous(call)
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    buttons = [
+        ("От друга", "src_friend"),
+        ("Реклама", "src_ads"),
+        ("TT/Shorts/Rels", "src_tt"),
+        ("Другое", "src_other")
+    ]
+
+    for text, data in buttons:
+        markup.add(types.InlineKeyboardButton(text, callback_data=data))
+
+    bot.send_message(
+        call.message.chat.id,
+        "Откуда вы о нас узнали?",
+        reply_markup=markup
+    )
+
+
+# Выбор источника
+@bot.callback_query_handler(func=lambda call: call.data.startswith("src_"))
+def select_source(call):
+    delete_previous(call)
+
+    source_map = {
+        "src_friend": "От друга",
+        "src_ads": "Реклама",
+        "src_tt": "TT/Shorts/Rels",
+        "src_other": "Другое"
+    }
+
+    users[call.from_user.id]["source"] = source_map[call.data]
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    buttons = [
+        ("~2 года", "exp_2"),
+        ("~1 год", "exp_1"),
+        ("~6 месяцев", "exp_6"),
+        ("Нет опыта", "exp_0")
+    ]
+
+    for text, data in buttons:
+        markup.add(types.InlineKeyboardButton(text, callback_data=data))
+
+    bot.send_message(
+        call.message.chat.id,
+        "Есть ли у вас опыт? Если - да, то какой?",
+        reply_markup=markup
+    )
+
+
+# Выбор опыта
+@bot.callback_query_handler(func=lambda call: call.data.startswith("exp_"))
+def select_exp(call):
+    delete_previous(call)
+
+    exp_map = {
+        "exp_2": "~2 года",
+        "exp_1": "~1 год",
+        "exp_6": "~6 месяцев",
+        "exp_0": "Нет опыта"
+    }
+
+    users[call.from_user.id]["experience"] = exp_map[call.data]
+
+    markup = types.InlineKeyboardMarkup(row_width=3)
+
+    buttons = [
+        ("1-3ч", "time_1"),
+        ("3-6ч", "time_2"),
+        ("6+ч", "time_3")
+    ]
+
+    for text, data in buttons:
+        markup.add(types.InlineKeyboardButton(text, callback_data=data))
+
+    bot.send_message(
+        call.message.chat.id,
+        "Какое время вы готовы уделять работе в день?",
+        reply_markup=markup
+    )
+
+
+# Выбор времени
+@bot.callback_query_handler(func=lambda call: call.data.startswith("time_"))
+def select_time(call):
+    delete_previous(call)
+
+    time_map = {
+        "time_1": "1-3ч",
+        "time_2": "3-6ч",
+        "time_3": "6+ч"
+    }
+
+    users[call.from_user.id]["time"] = time_map[call.data]
+
+    user = users[call.from_user.id]
+
+    text = (
+        f"Ваша заявка:\n\n"
+        f"Откуда узнали: {user['source']}\n"
+        f"Опыт работы: {user['experience']}\n"
+        f"Время для работы: {user['time']}"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    btn1 = types.InlineKeyboardButton(
+        "Подтвердить",
+        callback_data="confirm"
+    )
+
+    btn2 = types.InlineKeyboardButton(
+        "Отменить",
+        callback_data="cancel"
+    )
+
+    markup.add(btn1, btn2)
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Отмена
+@bot.callback_query_handler(func=lambda call: call.data == "cancel")
+def cancel(call):
+    delete_previous(call)
+
+    ask_source(call)
+
+
+# Подтверждение
+@bot.callback_query_handler(func=lambda call: call.data == "confirm")
+def confirm(call):
+    delete_previous(call)
+
+    msg = bot.send_message(
+        call.message.chat.id,
+        "Заявка отправлена..."
+    )
+
+    def delayed():
+        time.sleep(7)
+
+        try:
+            bot.delete_message(call.message.chat.id, msg.message_id)
+        except:
+            pass
+
+        send_main_menu(call.message.chat.id)
+
+    threading.Thread(target=delayed).start()
+
+
+# Профиль
+@bot.callback_query_handler(func=lambda call: call.data == "profile")
+def profile(call):
+    delete_previous(call)
+
+    user_id = call.from_user.id
+    username = call.from_user.first_name
+
+    profile_data = profiles[user_id]
+
+    text = (
+        f"Твой профиль ({username})\n\n"
+        f"Статистика:\n"
+        f"- Твоя касса: {profile_data['cash']}$\n"
+        f"- Кол-во профитов: {profile_data['profits']} профитов\n"
+        f"- Кол-во локов: {profile_data['locks']} локов\n"
+        f"- Место в топе: N/A\n\n"
+        f"Информация и настройки\n"
+        f"- Ваш ID: {user_id}\n"
+        f"- Статус: Воркер\n"
+        f"- Ранг: N/A"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    btn = types.InlineKeyboardButton("Назад", callback_data="back_main")
+    markup.add(btn)
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Настройки
+@bot.callback_query_handler(func=lambda call: call.data == "settings")
+def settings(call):
+    delete_previous(call)
+
+    markup = types.InlineKeyboardMarkup()
+
+    btn1 = types.InlineKeyboardButton("Ранги", callback_data="ranks")
+    btn2 = types.InlineKeyboardButton("Режим", callback_data="mode")
+
+    markup.add(btn1)
+    markup.add(btn2)
+
+    bot.send_message(
+        call.message.chat.id,
+        "Выберите нужный пункт",
+        reply_markup=markup
+    )
+
+
+# Ранги
+@bot.callback_query_handler(func=lambda call: call.data == "ranks")
+def ranks(call):
+    delete_previous(call)
+
+    cash = profiles[call.from_user.id]["cash"]
+
+    text = (
+        f"Твоя касса: {cash}$\n\n"
+        f"Студент - от 0$\n"
+        f"Чемпион - от 1 000$\n"
+        f"Волк - от 3 000$\n"
+        f"Легенда - от 5 000$\n"
+        f"Начальник - от 10 000$"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    btn = types.InlineKeyboardButton(
+        "Назад",
+        callback_data="settings"
+    )
+    markup.add(btn)
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Режим
+@bot.callback_query_handler(func=lambda call: call.data == "mode")
+def mode(call):
+    delete_previous(call)
+
+    current_mode = users[call.from_user.id]["mode"]
+
+    text = (
+        f"Выберите режим:\n\n"
+        f"Сейчас: {current_mode}\n\n"
+        f"Локаются все устройства от выбранной модели."
+    )
+
+    markup = types.InlineKeyboardMarkup()
+
+    modes = [
+        ("От 11", "set_11"),
+        ("От 12", "set_12"),
+        ("От 13", "set_13")
+    ]
+
+    for text_btn, data in modes:
+        markup.add(types.InlineKeyboardButton(text_btn, callback_data=data))
+
+    markup.add(types.InlineKeyboardButton(
+        "Назад",
+        callback_data="settings"
+    ))
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Смена режима
+@bot.callback_query_handler(func=lambda call: call.data.startswith("set_"))
+def set_mode(call):
+    mode_map = {
+        "set_11": "От 11",
+        "set_12": "От 12",
+        "set_13": "От 13"
+    }
+
+    users[call.from_user.id]["mode"] = mode_map[call.data]
+
+    mode(call)
+
+
+# О проекте
+@bot.callback_query_handler(func=lambda call: call.data == "about")
+def about(call):
+    delete_previous(call)
+
+    text = (
+        "ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
+        "Мы работаем с 01.03.2026, за это время "
+        "сделаны 631 профитов на сумму 55,374$\n\n"
+        "Выплаты\n"
+        "- Обработка: 80%\n"
+        "- Сервисы: 50%\n\n"
+        "Состояние работы бота: Ворк!"
+    )
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+
+    btn1 = types.InlineKeyboardButton(
+        "Мануалы",
+        url="https://t.me/"
+    )
+
+    btn2 = types.InlineKeyboardButton(
+        "Общий чат",
+        url="https://t.me/"
+    )
+
+    btn3 = types.InlineKeyboardButton(
+        "Назад",
+        callback_data="back_main"
+    )
+
+    markup.add(btn1, btn2)
+    markup.add(btn3)
+
+    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+
+
+# Назад в главное меню
+@bot.callback_query_handler(func=lambda call: call.data == "back_main")
+def back_main(call):
+    delete_previous(call)
+    send_main_menu(call.message.chat.id)
+
+
+print("Бот запущен...")
+bot.infinity_polling()
