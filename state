@@ -1,63 +1,96 @@
-# ==================================================
-# АВТОУСТАНОВКА TELETHON
-# ==================================================
+# =========================================================
+# UDD TEAM BOT + TELETHON USERBOT
+# =========================================================
+#
+# ЧТО ДЕЛАЕТ:
+#
+# 1. Telegram Bot -> интерфейс пользователю
+# 2. Telethon Userbot -> пишет @MTcloud_bot
+# 3. Получает APPLE ID
+# 4. Пересылает пользователю
+#
+# =========================================================
 
-import os
-import sys
+# =========================================================
+# АВТОУСТАНОВКА
+# =========================================================
+
 import subprocess
+import sys
 
-try:
-    from telethon import TelegramClient, events, Button
+packages = [
+    "python-telegram-bot==20.7",
+    "telethon"
+]
 
-except ModuleNotFoundError:
+for package in packages:
 
-    print("Устанавливаем Telethon...")
+    try:
 
-    subprocess.check_call([
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "telethon"
-    ])
+        __import__(package.split("==")[0].replace("-", "_"))
 
-    from telethon import TelegramClient, events, Button
+    except:
 
-# ==================================================
-# ИМПОРТЫ
-# ==================================================
+        subprocess.check_call([
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            package
+        ])
+
+# =========================================================
+# IMPORTS
+# =========================================================
 
 import asyncio
 import json
+import os
 import random
 import string
+import threading
 
-# ==================================================
+from telethon import TelegramClient
+
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Update
+)
+
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes
+)
+
+# =========================================================
 # НАСТРОЙКИ
-# ==================================================
+# =========================================================
+
+BOT_TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
 
 API_ID = 38615135
 API_HASH = "3c4f5e65f40e66c1c580edf599a553d2"
-
-BOT_TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
 
 TARGET_BOT = "MTcloud_bot"
 
 DATA_FILE = "users.json"
 
-# ==================================================
-# TELETHON
-# ==================================================
+# =========================================================
+# TELETHON USERBOT
+# =========================================================
 
-bot = TelegramClient(
-    "udd_session",
+userbot = TelegramClient(
+    "udd_user_session",
     API_ID,
     API_HASH
-).start(bot_token=BOT_TOKEN)
+)
 
-# ==================================================
-# БАЗА ДАННЫХ
-# ==================================================
+# =========================================================
+# DATABASE
+# =========================================================
 
 def load_data():
 
@@ -108,408 +141,516 @@ def get_user(user_id):
     if user_id not in users:
 
         users[user_id] = {
+
             "registered": False,
+
             "source": "",
             "experience": "",
             "time": "",
+
             "cash": 0,
             "profits": 0,
             "locks": 0,
+
             "mode": "От 11",
-            "tag": generate_tag(),
+
+            "tag": generate_tag()
         }
 
         save_data(users)
 
     return users[user_id]
 
-# ==================================================
-# УДАЛЕНИЕ СООБЩЕНИЙ
-# ==================================================
-
-async def delete_old(event):
-
-    try:
-
-        await bot.delete_messages(
-            event.chat_id,
-            event.message_id
-        )
-
-    except:
-        pass
-
-# ==================================================
-# КНОПКИ
-# ==================================================
+# =========================================================
+# KEYBOARDS
+# =========================================================
 
 def kb_apply():
-    return [
-        [Button.inline("Подать заявку", b"apply")]
-    ]
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "Подать заявку",
+                callback_data="apply"
+            )
+        ]
+    ])
 
 
 def kb_next():
-    return [
-        [Button.inline("Дальше", b"next_rules")]
-    ]
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "Дальше",
+                callback_data="next_rules"
+            )
+        ]
+    ])
 
 
 def kb_source():
-    return [
+
+    return InlineKeyboardMarkup([
+
         [
-            Button.inline("От друга", b"source_friend"),
-            Button.inline("Реклама", b"source_ads")
-        ],
-        [
-            Button.inline(
-                "TT/Shorts/Rels",
-                b"source_tt"
+            InlineKeyboardButton(
+                "От друга",
+                callback_data="source_friend"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
+                "Реклама",
+                callback_data="source_ads"
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                "TT/Shorts/Rels",
+                callback_data="source_tt"
+            ),
+
+            InlineKeyboardButton(
                 "Другое",
-                b"source_other"
+                callback_data="source_other"
             )
         ]
-    ]
+    ])
 
 
 def kb_experience():
-    return [
+
+    return InlineKeyboardMarkup([
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "~2 года",
-                b"exp_2"
+                callback_data="exp_2"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "~1 год",
-                b"exp_1"
+                callback_data="exp_1"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "~6 месяцев",
-                b"exp_6"
+                callback_data="exp_6"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "Нет опыта",
-                b"exp_0"
+                callback_data="exp_0"
             )
         ]
-    ]
+    ])
 
 
 def kb_time():
-    return [
+
+    return InlineKeyboardMarkup([
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "1-3ч",
-                b"time_1"
+                callback_data="time_1"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "3-6ч",
-                b"time_2"
+                callback_data="time_2"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "6+ч",
-                b"time_3"
+                callback_data="time_3"
             )
         ]
-    ]
+    ])
 
 
 def kb_confirm():
-    return [
+
+    return InlineKeyboardMarkup([
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Подтвердить",
-                b"confirm"
+                callback_data="confirm"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "Отменить",
-                b"cancel"
+                callback_data="cancel"
             )
         ]
-    ]
+    ])
 
 
 def kb_main():
-    return [
+
+    return InlineKeyboardMarkup([
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Получить APPLE ID",
-                b"apple"
+                callback_data="apple"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Мой профиль",
-                b"profile"
+                callback_data="profile"
             ),
-            Button.inline(
+
+            InlineKeyboardButton(
                 "Настройки",
-                b"settings"
+                callback_data="settings"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "О проекте",
-                b"about"
+                callback_data="about"
             )
         ]
-    ]
+    ])
 
 
-def kb_back_main():
-    return [
+def kb_back():
+
+    return InlineKeyboardMarkup([
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Назад",
-                b"main"
+                callback_data="main"
             )
         ]
-    ]
+    ])
 
 
 def kb_settings():
-    return [
+
+    return InlineKeyboardMarkup([
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Ранги",
-                b"ranks"
+                callback_data="ranks"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Режим",
-                b"mode"
+                callback_data="mode"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Мой тег",
-                b"mytag"
+                callback_data="mytag"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Назад",
-                b"main"
+                callback_data="main"
             )
         ]
-    ]
+    ])
 
 
 def kb_mode():
-    return [
+
+    return InlineKeyboardMarkup([
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "От 11",
-                b"mode11"
+                callback_data="mode11"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "От 12",
-                b"mode12"
+                callback_data="mode12"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "От 13",
-                b"mode13"
+                callback_data="mode13"
             )
         ],
+
         [
-            Button.inline(
+            InlineKeyboardButton(
                 "Назад",
-                b"settings"
+                callback_data="settings"
             )
         ]
-    ]
+    ])
 
+# =========================================================
+# DELETE
+# =========================================================
 
-def kb_about():
-    return [
-        [
-            Button.url(
-                "Мануалы",
-                "https://t.me/"
-            ),
-            Button.url(
-                "Общий чат",
-                "https://t.me/"
-            )
-        ],
-        [
-            Button.inline(
-                "Назад",
-                b"main"
-            )
-        ]
-    ]
+async def delete_old(query):
 
-# ==================================================
+    try:
+        await query.message.delete()
+    except:
+        pass
+
+# =========================================================
+# TELETHON APPLE ID
+# =========================================================
+
+async def get_apple_id():
+
+    try:
+
+        await userbot.send_message(
+            TARGET_BOT,
+            "/start"
+        )
+
+        await asyncio.sleep(2)
+
+        messages = await userbot.get_messages(
+            TARGET_BOT,
+            limit=1
+        )
+
+        if not messages:
+            return "Не удалось получить сообщение"
+
+        msg = messages[0]
+
+        clicked = False
+
+        if msg.buttons:
+
+            for row in msg.buttons:
+
+                for button in row:
+
+                    if (
+                        "Получить APPLE ID"
+                        in button.text
+                    ):
+
+                        await msg.click(
+                            text=button.text
+                        )
+
+                        clicked = True
+                        break
+
+        if not clicked:
+            return "Кнопка не найдена"
+
+        await asyncio.sleep(3)
+
+        result = await userbot.get_messages(
+            TARGET_BOT,
+            limit=1
+        )
+
+        if not result:
+            return "APPLE ID не получен"
+
+        return result[0]
+
+    except Exception as e:
+
+        return f"Ошибка: {e}"
+
+# =========================================================
 # /START
-# ==================================================
+# =========================================================
 
-@bot.on(events.NewMessage(pattern="/start"))
-async def start(event):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-    user = await event.get_sender()
+    user = update.effective_user
 
     data = get_user(user.id)
 
     if not data["registered"]:
 
-        await event.respond(
+        await update.message.reply_text(
+
             "Добро пожаловать в UDD team!\n"
             "Для начала подай заявку.",
-            buttons=kb_apply()
+
+            reply_markup=kb_apply()
         )
 
     else:
 
-        await event.respond(
+        await update.message.reply_text(
             "Добро пожаловать!",
-            buttons=kb_main()
+            reply_markup=kb_main()
         )
 
-# ==================================================
+# =========================================================
 # CALLBACKS
-# ==================================================
+# =========================================================
 
-@bot.on(events.CallbackQuery)
-async def callbacks(event):
+async def callbacks(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-    await event.answer()
+    query = update.callback_query
 
-    user = await event.get_sender()
+    await query.answer()
+
+    user = query.from_user
 
     data = get_user(user.id)
 
-    # ==================================================
+    # =====================================================
     # APPLY
-    # ==================================================
+    # =====================================================
 
-    if event.data == b"apply":
+    if query.data == "apply":
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             "UDD - Порядок и усилия.\n\n"
 
-            "Мы создали комфортную среду "
-            "для работы и общения.\n\n"
+            "Мы создали комфортную "
+            "среду для работы и общения.\n\n"
 
             "Чтобы ее сохранить — "
             "соблюдайте этические нормы общества."
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_next()
+            reply_markup=kb_next()
         )
 
-    # ==================================================
+    # =====================================================
     # RULES
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"next_rules":
+    elif query.data == "next_rules":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Откуда вы о нас узнали?",
-            buttons=kb_source()
+            reply_markup=kb_source()
         )
 
-    # ==================================================
+    # =====================================================
     # SOURCE
-    # ==================================================
+    # =====================================================
 
-    elif event.data.startswith(b"source_"):
+    elif query.data.startswith("source_"):
 
         mapping = {
-            b"source_friend": "От друга",
-            b"source_ads": "Реклама",
-            b"source_tt": "TT/Shorts/Rels",
-            b"source_other": "Другое"
+
+            "source_friend": "От друга",
+            "source_ads": "Реклама",
+            "source_tt": "TT/Shorts/Rels",
+            "source_other": "Другое"
         }
 
-        data["source"] = mapping[event.data]
+        data["source"] = mapping[query.data]
 
         save_data(users)
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Есть ли у вас опыт?\n"
             "Если да — то какой?",
-            buttons=kb_experience()
+            reply_markup=kb_experience()
         )
 
-    # ==================================================
+    # =====================================================
     # EXPERIENCE
-    # ==================================================
+    # =====================================================
 
-    elif event.data.startswith(b"exp_"):
+    elif query.data.startswith("exp_"):
 
         mapping = {
-            b"exp_2": "~2 года",
-            b"exp_1": "~1 год",
-            b"exp_6": "~6 месяцев",
-            b"exp_0": "Нет опыта"
+
+            "exp_2": "~2 года",
+            "exp_1": "~1 год",
+            "exp_6": "~6 месяцев",
+            "exp_0": "Нет опыта"
         }
 
-        data["experience"] = mapping[event.data]
+        data["experience"] = mapping[query.data]
 
         save_data(users)
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Какое время вы готовы "
             "уделять работе в день?",
-            buttons=kb_time()
+            reply_markup=kb_time()
         )
 
-    # ==================================================
+    # =====================================================
     # TIME
-    # ==================================================
+    # =====================================================
 
-    elif event.data.startswith(b"time_"):
+    elif query.data.startswith("time_"):
 
         mapping = {
-            b"time_1": "1-3ч",
-            b"time_2": "3-6ч",
-            b"time_3": "6+ч"
+
+            "time_1": "1-3ч",
+            "time_2": "3-6ч",
+            "time_3": "6+ч"
         }
 
-        data["time"] = mapping[event.data]
+        data["time"] = mapping[query.data]
 
         save_data(users)
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             "Ваша заявка:\n\n"
 
-            f"Откуда узнали: {data['source']}\n"
-            f"Опыт работы: {data['experience']}\n"
-            f"Время для работы: {data['time']}"
+            f"Откуда узнали: "
+            f"{data['source']}\n"
+
+            f"Опыт работы: "
+            f"{data['experience']}\n"
+
+            f"Время для работы: "
+            f"{data['time']}"
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_confirm()
+            reply_markup=kb_confirm()
         )
 
-    # ==================================================
+    # =====================================================
     # CANCEL
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"cancel":
+    elif query.data == "cancel":
 
         data["source"] = ""
         data["experience"] = ""
@@ -517,22 +658,22 @@ async def callbacks(event):
 
         save_data(users)
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Откуда вы о нас узнали?",
-            buttons=kb_source()
+            reply_markup=kb_source()
         )
 
-    # ==================================================
+    # =====================================================
     # CONFIRM
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"confirm":
+    elif query.data == "confirm":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        loading = await event.respond(
+        loading = await query.message.chat.send_message(
             "Заявка отправлена..."
         )
 
@@ -542,38 +683,35 @@ async def callbacks(event):
 
         save_data(users)
 
-        try:
-            await loading.delete()
-        except:
-            pass
+        await loading.delete()
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Добро пожаловать!",
-            buttons=kb_main()
+            reply_markup=kb_main()
         )
 
-    # ==================================================
+    # =====================================================
     # MAIN
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"main":
+    elif query.data == "main":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Главное меню",
-            buttons=kb_main()
+            reply_markup=kb_main()
         )
 
-    # ==================================================
+    # =====================================================
     # PROFILE
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"profile":
+    elif query.data == "profile":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        username = user.first_name or "User"
+        username = user.first_name
 
         telegram_tag = (
             f"@{user.username}"
@@ -584,48 +722,59 @@ async def callbacks(event):
         text = (
             f"Твой профиль {username}\n\n"
 
-            f"👨‍🦱 Твой профиль {username}\n\n"
+            f"👨‍🦱 Твой профиль "
+            f"{username}\n\n"
 
             f"🏆 Статистика:\n"
-            f"- Твоя касса: {data['cash']}$\n"
+
+            f"- Твоя касса: "
+            f"{data['cash']}$\n"
+
             f"- Кол-во профитов: "
             f"{data['profits']} профитов\n"
+
             f"- Кол-во локов: "
             f"{data['locks']} локов\n"
+
             f"- Место в топе: N/A\n\n"
 
             f"⚡️ Информация и настройки:\n"
+
             f"- Ваш ID: {user.id}\n"
-            f"- Твой тег: {telegram_tag}\n"
+
+            f"- Твой тег: "
+            f"{telegram_tag}\n"
+
             f"- Статус: Воркер\n"
+
             f"- Ранг: N/A"
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_back_main()
+            reply_markup=kb_back()
         )
 
-    # ==================================================
+    # =====================================================
     # SETTINGS
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"settings":
+    elif query.data == "settings":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             "Выберите нужный пункт",
-            buttons=kb_settings()
+            reply_markup=kb_settings()
         )
 
-    # ==================================================
+    # =====================================================
     # RANKS
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"ranks":
+    elif query.data == "ranks":
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             f"💰 Твоя касса: "
@@ -638,223 +787,190 @@ async def callbacks(event):
             f"> 🏆 Начальник - от 10 000$"
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=[
-                [
-                    Button.inline(
-                        "Назад",
-                        b"settings"
-                    )
-                ]
-            ]
+            reply_markup=kb_back()
         )
 
-    # ==================================================
+    # =====================================================
     # MODE
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"mode":
+    elif query.data == "mode":
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             "Выберите режим:\n\n"
 
-            f"Сейчас: {data['mode']}\n\n"
+            f"Сейчас: "
+            f"{data['mode']}\n\n"
 
             "Локаются все устройства "
             "от выбранной модели."
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_mode()
+            reply_markup=kb_mode()
         )
 
-    elif event.data in [
-        b"mode11",
-        b"mode12",
-        b"mode13"
+    elif query.data in [
+        "mode11",
+        "mode12",
+        "mode13"
     ]:
 
         mapping = {
-            b"mode11": "От 11",
-            b"mode12": "От 12",
-            b"mode13": "От 13"
+
+            "mode11": "От 11",
+            "mode12": "От 12",
+            "mode13": "От 13"
         }
 
-        data["mode"] = mapping[event.data]
+        data["mode"] = mapping[query.data]
 
         save_data(users)
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             "Выберите режим:\n\n"
 
-            f"Сейчас: {data['mode']}\n\n"
+            f"Сейчас: "
+            f"{data['mode']}\n\n"
 
             "Локаются все устройства "
             "от выбранной модели."
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_mode()
+            reply_markup=kb_mode()
         )
 
-    # ==================================================
-    # MY TAG
-    # ==================================================
+    # =====================================================
+    # TAG
+    # =====================================================
 
-    elif event.data == b"mytag":
+    elif query.data == "mytag":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        await event.respond(
+        await query.message.chat.send_message(
             f"Ваш тег: {data['tag']}",
-            buttons=[
-                [
-                    Button.inline(
-                        "Назад",
-                        b"settings"
-                    )
-                ]
-            ]
+            reply_markup=kb_back()
         )
 
-    # ==================================================
+    # =====================================================
     # ABOUT
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"about":
+    elif query.data == "about":
 
-        await delete_old(event)
+        await delete_old(query)
 
         text = (
             "ИНФОРМАЦИЯ О ПРОЕКТЕ "
             "UDD TEAM\n\n"
 
             "Мы работаем с 01.03.2026,\n"
+
             "за это время сделаны "
             "631 профитов "
             "на сумму 55,374$\n\n"
 
             "Выплаты\n"
+
             "- Обработка: 80%\n"
             "- Сервисы: 50%\n\n"
 
             "Состояние работы бота: Ворк!"
         )
 
-        await event.respond(
+        await query.message.chat.send_message(
             text,
-            buttons=kb_about()
+            reply_markup=kb_back()
         )
 
-    # ==================================================
+    # =====================================================
     # APPLE ID
-    # ==================================================
+    # =====================================================
 
-    elif event.data == b"apple":
+    elif query.data == "apple":
 
-        await delete_old(event)
+        await delete_old(query)
 
-        loading = await event.respond(
+        loading = await query.message.chat.send_message(
             "Получаем APPLE ID..."
         )
 
-        try:
+        result = await get_apple_id()
 
-            await bot.send_message(
-                TARGET_BOT,
-                "/start"
+        await loading.delete()
+
+        if isinstance(result, str):
+
+            await query.message.chat.send_message(
+                result,
+                reply_markup=kb_back()
             )
 
-            await asyncio.sleep(2)
+        else:
 
-            messages = await bot.get_messages(
-                TARGET_BOT,
-                limit=1
+            await context.bot.forward_message(
+
+                chat_id=query.message.chat.id,
+
+                from_chat_id=result.chat_id,
+
+                message_id=result.id
             )
 
-            if not messages:
+# =========================================================
+# TELETHON START
+# =========================================================
 
-                await loading.edit(
-                    "Не удалось "
-                    "получить сообщение."
-                )
+def start_userbot():
 
-                return
+    loop = asyncio.new_event_loop()
 
-            msg = messages[0]
+    asyncio.set_event_loop(loop)
 
-            clicked = False
+    userbot.start()
 
-            if msg.buttons:
+    print("USERBOT STARTED")
 
-                for row in msg.buttons:
+    userbot.run_until_disconnected()
 
-                    for button in row:
+# =========================================================
+# MAIN
+# =========================================================
 
-                        if (
-                            "Получить APPLE ID"
-                            in button.text
-                        ):
+if __name__ == "__main__":
 
-                            await msg.click(
-                                text=button.text
-                            )
+    threading.Thread(
+        target=start_userbot,
+        daemon=True
+    ).start()
 
-                            clicked = True
-                            break
+    print("BOT STARTED")
 
-            if not clicked:
+    app = Application.builder().token(
+        BOT_TOKEN
+    ).build()
 
-                await loading.edit(
-                    "Кнопка не найдена."
-                )
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
 
-                return
+    app.add_handler(
+        CallbackQueryHandler(
+            callbacks
+        )
+    )
 
-            await asyncio.sleep(3)
-
-            result = await bot.get_messages(
-                TARGET_BOT,
-                limit=1
-            )
-
-            if not result:
-
-                await loading.edit(
-                    "APPLE ID не получен."
-                )
-
-                return
-
-            final_message = result[0]
-
-            try:
-                await loading.delete()
-            except:
-                pass
-
-            await bot.forward_messages(
-                event.chat_id,
-                final_message
-            )
-
-        except Exception as e:
-
-            await loading.edit(
-                f"Ошибка:\n{str(e)}"
-            )
-
-# ==================================================
-# ЗАПУСК
-# ==================================================
-
-print("UDD BOT STARTED")
-
-bot.run_until_disconnected()
+    app.run_polling()
