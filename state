@@ -1,4 +1,20 @@
-from telethon import TelegramClient
+import subprocess
+import sys
+
+try:
+    from telethon import TelegramClient
+
+except:
+
+    subprocess.check_call([
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "telethon"
+    ])
+
+    from telethon import TelegramClient
 
 API_ID = 12345678
 API_HASH = "YOUR_API_HASH"
