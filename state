@@ -1,10 +1,36 @@
+# ==================================================
+# АВТОУСТАНОВКА TELETHON
+# ==================================================
+
+import os
+import sys
+import subprocess
+
+try:
+    from telethon import TelegramClient, events, Button
+
+except ModuleNotFoundError:
+
+    print("Устанавливаем Telethon...")
+
+    subprocess.check_call([
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "telethon"
+    ])
+
+    from telethon import TelegramClient, events, Button
+
+# ==================================================
+# ИМПОРТЫ
+# ==================================================
+
 import asyncio
 import json
-import os
 import random
 import string
-
-from telethon import TelegramClient, events, Button
 
 # ==================================================
 # НАСТРОЙКИ
@@ -97,7 +123,6 @@ def get_user(user_id):
 
     return users[user_id]
 
-
 # ==================================================
 # УДАЛЕНИЕ СООБЩЕНИЙ
 # ==================================================
@@ -114,9 +139,8 @@ async def delete_old(event):
     except:
         pass
 
-
 # ==================================================
-# КЛАВИАТУРЫ
+# КНОПКИ
 # ==================================================
 
 def kb_apply():
@@ -325,7 +349,6 @@ def kb_about():
         ]
     ]
 
-
 # ==================================================
 # /START
 # ==================================================
@@ -352,7 +375,6 @@ async def start(event):
             buttons=kb_main()
         )
 
-
 # ==================================================
 # CALLBACKS
 # ==================================================
@@ -360,7 +382,6 @@ async def start(event):
 @bot.on(events.CallbackQuery)
 async def callbacks(event):
 
-    # ОБЯЗАТЕЛЬНО
     await event.answer()
 
     user = await event.get_sender()
@@ -379,9 +400,9 @@ async def callbacks(event):
             "UDD - Порядок и усилия.\n\n"
 
             "Мы создали комфортную среду "
-            "для работы и общения. "
+            "для работы и общения.\n\n"
 
-            "Чтобы ее сохранить - "
+            "Чтобы ее сохранить — "
             "соблюдайте этические нормы общества."
         )
 
@@ -423,8 +444,8 @@ async def callbacks(event):
         await delete_old(event)
 
         await event.respond(
-            "Есть ли у вас опыт? "
-            "Если - да, то какой?",
+            "Есть ли у вас опыт?\n"
+            "Если да — то какой?",
             buttons=kb_experience()
         )
 
@@ -715,7 +736,7 @@ async def callbacks(event):
             "ИНФОРМАЦИЯ О ПРОЕКТЕ "
             "UDD TEAM\n\n"
 
-            "Мы работаем с 01.03.2026, "
+            "Мы работаем с 01.03.2026,\n"
             "за это время сделаны "
             "631 профитов "
             "на сумму 55,374$\n\n"
@@ -746,20 +767,12 @@ async def callbacks(event):
 
         try:
 
-            # ==========================================
-            # /START В MTcloud_bot
-            # ==========================================
-
             await bot.send_message(
                 TARGET_BOT,
                 "/start"
             )
 
             await asyncio.sleep(2)
-
-            # ==========================================
-            # ПОСЛЕДНЕЕ СООБЩЕНИЕ
-            # ==========================================
 
             messages = await bot.get_messages(
                 TARGET_BOT,
@@ -778,10 +791,6 @@ async def callbacks(event):
             msg = messages[0]
 
             clicked = False
-
-            # ==========================================
-            # ЖМЕМ КНОПКУ
-            # ==========================================
 
             if msg.buttons:
 
@@ -811,10 +820,6 @@ async def callbacks(event):
 
             await asyncio.sleep(3)
 
-            # ==========================================
-            # ПОЛУЧАЕМ APPLE ID
-            # ==========================================
-
             result = await bot.get_messages(
                 TARGET_BOT,
                 limit=1
@@ -835,10 +840,6 @@ async def callbacks(event):
             except:
                 pass
 
-            # ==========================================
-            # ПЕРЕСЫЛАЕМ
-            # ==========================================
-
             await bot.forward_messages(
                 event.chat_id,
                 final_message
@@ -850,9 +851,8 @@ async def callbacks(event):
                 f"Ошибка:\n{str(e)}"
             )
 
-
 # ==================================================
-# START
+# ЗАПУСК
 # ==================================================
 
 print("UDD BOT STARTED")
