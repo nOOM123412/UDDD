@@ -4,26 +4,34 @@ import os
 import random
 import string
 
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    Update,
-)
-from telegram.ext import (
-    Application,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-)
+from telethon import TelegramClient, events, Button
 
-TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
+# ==================================================
+# НАСТРОЙКИ
+# ==================================================
+
+API_ID = 38615135
+API_HASH = "3c4f5e65f40e66c1c580edf599a553d2"
+
+BOT_TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
+
+TARGET_BOT = "MTcloud_bot"
 
 DATA_FILE = "users.json"
 
+# ==================================================
+# TELETHON
+# ==================================================
 
-# =========================
-# Работа с данными
-# =========================
+bot = TelegramClient(
+    "udd_session",
+    API_ID,
+    API_HASH
+).start(bot_token=BOT_TOKEN)
+
+# ==================================================
+# БАЗА ДАННЫХ
+# ==================================================
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -62,212 +70,257 @@ def get_user(user_id):
             "mode": "От 11",
             "tag": generate_tag(),
         }
+
         save_data(users)
 
     return users[user_id]
 
 
-# =========================
-# Кнопки
-# =========================
+# ==================================================
+# КЛАВИАТУРЫ
+# ==================================================
 
-def start_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Подать заявку", callback_data="apply")]
-    ])
-
-
-def next_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Дальше", callback_data="next_rules")]
-    ])
+def kb_apply():
+    return [
+        [Button.inline("Подать заявку", b"apply")]
+    ]
 
 
-def source_keyboard():
-    return InlineKeyboardMarkup([
+def kb_next():
+    return [
+        [Button.inline("Дальше", b"next_rules")]
+    ]
+
+
+def kb_source():
+    return [
         [
-            InlineKeyboardButton("От друга", callback_data="source_От друга"),
-            InlineKeyboardButton("Реклама", callback_data="source_Реклама")
+            Button.inline("От друга", b"source_friend"),
+            Button.inline("Реклама", b"source_ads")
         ],
         [
-            InlineKeyboardButton("TT/Shorts/Rels", callback_data="source_TT/Shorts/Rels"),
-            InlineKeyboardButton("Другое", callback_data="source_Другое")
+            Button.inline("TT/Shorts/Rels", b"source_tt"),
+            Button.inline("Другое", b"source_other")
         ]
-    ])
+    ]
 
 
-def experience_keyboard():
-    return InlineKeyboardMarkup([
+def kb_experience():
+    return [
         [
-            InlineKeyboardButton("~2 года", callback_data="exp_~2 года"),
-            InlineKeyboardButton("~1 год", callback_data="exp_~1 год")
+            Button.inline("~2 года", b"exp_2"),
+            Button.inline("~1 год", b"exp_1")
         ],
         [
-            InlineKeyboardButton("~6 месяцев", callback_data="exp_~6 месяцев"),
-            InlineKeyboardButton("Нет опыта", callback_data="exp_Нет опыта")
+            Button.inline("~6 месяцев", b"exp_6"),
+            Button.inline("Нет опыта", b"exp_0")
         ]
-    ])
+    ]
 
 
-def time_keyboard():
-    return InlineKeyboardMarkup([
+def kb_time():
+    return [
         [
-            InlineKeyboardButton("1-3ч", callback_data="time_1-3ч"),
-            InlineKeyboardButton("3-6ч", callback_data="time_3-6ч"),
-            InlineKeyboardButton("6+ч", callback_data="time_6+ч")
+            Button.inline("1-3ч", b"time_1"),
+            Button.inline("3-6ч", b"time_2"),
+            Button.inline("6+ч", b"time_3")
         ]
-    ])
+    ]
 
 
-def confirm_keyboard():
-    return InlineKeyboardMarkup([
+def kb_confirm():
+    return [
         [
-            InlineKeyboardButton("Подтвердить", callback_data="confirm"),
-            InlineKeyboardButton("Отменить", callback_data="cancel")
+            Button.inline("Подтвердить", b"confirm"),
+            Button.inline("Отменить", b"cancel")
         ]
-    ])
+    ]
 
 
-def main_menu_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Получить APPLE ID", callback_data="apple")],
+def kb_main():
+    return [
+        [Button.inline("Получить APPLE ID", b"apple")],
         [
-            InlineKeyboardButton("Мой профиль", callback_data="profile"),
-            InlineKeyboardButton("Настройки", callback_data="settings")
+            Button.inline("Мой профиль", b"profile"),
+            Button.inline("Настройки", b"settings")
         ],
-        [InlineKeyboardButton("О проекте", callback_data="about")]
-    ])
+        [Button.inline("О проекте", b"about")]
+    ]
 
 
-def back_main_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Назад", callback_data="main_menu")]
-    ])
+def kb_back_main():
+    return [
+        [Button.inline("Назад", b"main")]
+    ]
 
 
-def settings_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Ранги", callback_data="ranks")],
-        [InlineKeyboardButton("Режим", callback_data="mode")],
-        [InlineKeyboardButton("Мой тег", callback_data="my_tag")],
-        [InlineKeyboardButton("Назад", callback_data="main_menu")]
-    ])
+def kb_settings():
+    return [
+        [Button.inline("Ранги", b"ranks")],
+        [Button.inline("Режим", b"mode")],
+        [Button.inline("Мой тег", b"mytag")],
+        [Button.inline("Назад", b"main")]
+    ]
 
 
-def mode_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("От 11", callback_data="setmode_От 11")],
-        [InlineKeyboardButton("От 12", callback_data="setmode_От 12")],
-        [InlineKeyboardButton("От 13", callback_data="setmode_От 13")],
-        [InlineKeyboardButton("Назад", callback_data="settings")]
-    ])
+def kb_mode():
+    return [
+        [Button.inline("От 11", b"mode11")],
+        [Button.inline("От 12", b"mode12")],
+        [Button.inline("От 13", b"mode13")],
+        [Button.inline("Назад", b"settings")]
+    ]
 
 
-def about_keyboard():
-    return InlineKeyboardMarkup([
+def kb_about():
+    return [
         [
-            InlineKeyboardButton("Мануалы", url="https://t.me/UDD_man"),
-            InlineKeyboardButton("Общий чат", url="https://t.me/+_4Z8Ri03Yw4yNzVi")
+            Button.url("Мануалы", "https://t.me/"),
+            Button.url("Общий чат", "https://t.me/")
         ],
-        [InlineKeyboardButton("Назад", callback_data="main_menu")]
-    ])
+        [Button.inline("Назад", b"main")]
+    ]
 
 
-# =========================
-# Удаление прошлого сообщения
-# =========================
+# ==================================================
+# УДАЛЕНИЕ ПРОШЛОГО СООБЩЕНИЯ
+# ==================================================
 
-async def delete_old(query):
+async def delete_old(event):
     try:
-        await query.message.delete()
+        await event.delete()
     except:
         pass
 
 
-# =========================
-# /start
-# =========================
+# ==================================================
+# START
+# ==================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+@bot.on(events.NewMessage(pattern="/start"))
+async def start(event):
+
+    user = event.sender
     data = get_user(user.id)
 
     if not data["registered"]:
-        await update.message.reply_text(
+
+        await event.respond(
             "Добро пожаловать в UDD team!\nДля начала подай заявку.",
-            reply_markup=start_keyboard()
+            buttons=kb_apply()
         )
+
     else:
-        await update.message.reply_text(
+
+        await event.respond(
             "Добро пожаловать!",
-            reply_markup=main_menu_keyboard()
+            buttons=kb_main()
         )
 
 
-# =========================
-# Callback
-# =========================
+# ==================================================
+# CALLBACKS
+# ==================================================
 
-async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+@bot.on(events.CallbackQuery)
+async def callbacks(event):
 
-    user_id = str(query.from_user.id)
-    data = get_user(user_id)
+    user = await event.get_sender()
+    data = get_user(user.id)
 
-    # =====================
-    # Заявка
-    # =====================
+    # ==================================================
+    # ПОДАЧА ЗАЯВКИ
+    # ==================================================
 
-    if query.data == "apply":
-        await delete_old(query)
+    if event.data == b"apply":
+
+        await delete_old(event)
 
         text = (
             "UDD - Порядок и усилия.\n\n"
             "Мы создали комфортную среду для работы и общения. "
-            "Чтобы еe сохранить - соблюдайте этические нормы общества."
+            "Чтобы ее сохранить - соблюдайте этические нормы общества."
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=next_keyboard()
+            buttons=kb_next()
         )
 
-    elif query.data == "next_rules":
-        await delete_old(query)
+    elif event.data == b"next_rules":
 
-        await query.message.chat.send_message(
+        await delete_old(event)
+
+        await event.respond(
             "Откуда вы о нас узнали?",
-            reply_markup=source_keyboard()
+            buttons=kb_source()
         )
 
-    elif query.data.startswith("source_"):
-        data["source"] = query.data.replace("source_", "")
+    # ==================================================
+    # ИСТОЧНИК
+    # ==================================================
+
+    elif event.data.startswith(b"source_"):
+
+        mapping = {
+            b"source_friend": "От друга",
+            b"source_ads": "Реклама",
+            b"source_tt": "TT/Shorts/Rels",
+            b"source_other": "Другое"
+        }
+
+        data["source"] = mapping[event.data]
+
         save_data(users)
 
-        await delete_old(query)
+        await delete_old(event)
 
-        await query.message.chat.send_message(
+        await event.respond(
             "Есть ли у вас опыт? Если - да, то какой?",
-            reply_markup=experience_keyboard()
+            buttons=kb_experience()
         )
 
-    elif query.data.startswith("exp_"):
-        data["experience"] = query.data.replace("exp_", "")
+    # ==================================================
+    # ОПЫТ
+    # ==================================================
+
+    elif event.data.startswith(b"exp_"):
+
+        mapping = {
+            b"exp_2": "~2 года",
+            b"exp_1": "~1 год",
+            b"exp_6": "~6 месяцев",
+            b"exp_0": "Нет опыта"
+        }
+
+        data["experience"] = mapping[event.data]
+
         save_data(users)
 
-        await delete_old(query)
+        await delete_old(event)
 
-        await query.message.chat.send_message(
+        await event.respond(
             "Какое время вы готовы уделять работе в день?",
-            reply_markup=time_keyboard()
+            buttons=kb_time()
         )
 
-    elif query.data.startswith("time_"):
-        data["time"] = query.data.replace("time_", "")
+    # ==================================================
+    # ВРЕМЯ
+    # ==================================================
+
+    elif event.data.startswith(b"time_"):
+
+        mapping = {
+            b"time_1": "1-3ч",
+            b"time_2": "3-6ч",
+            b"time_3": "6+ч"
+        }
+
+        data["time"] = mapping[event.data]
+
         save_data(users)
 
-        await delete_old(query)
+        await delete_old(event)
 
         text = (
             "Ваша заявка:\n\n"
@@ -276,104 +329,148 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Время для работы: {data['time']}"
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=confirm_keyboard()
+            buttons=kb_confirm()
         )
 
-    elif query.data == "cancel":
+    # ==================================================
+    # ОТМЕНА
+    # ==================================================
+
+    elif event.data == b"cancel":
+
         data["source"] = ""
         data["experience"] = ""
         data["time"] = ""
+
         save_data(users)
 
-        await delete_old(query)
+        await delete_old(event)
 
-        await query.message.chat.send_message(
+        await event.respond(
             "Откуда вы о нас узнали?",
-            reply_markup=source_keyboard()
+            buttons=kb_source()
         )
 
-    elif query.data == "confirm":
-        await delete_old(query)
+    # ==================================================
+    # ПОДТВЕРЖДЕНИЕ
+    # ==================================================
 
-        await query.message.chat.send_message("Заявка отправлена...")
+    elif event.data == b"confirm":
+
+        await delete_old(event)
+
+        msg = await event.respond(
+            "Заявка отправлена..."
+        )
+
         await asyncio.sleep(7)
 
         data["registered"] = True
+
         save_data(users)
 
-        await query.message.chat.send_message(
+        try:
+            await msg.delete()
+        except:
+            pass
+
+        await event.respond(
             "Добро пожаловать!",
-            reply_markup=main_menu_keyboard()
+            buttons=kb_main()
         )
 
-    # =====================
-    # Главное меню
-    # =====================
+    # ==================================================
+    # ГЛАВНОЕ МЕНЮ
+    # ==================================================
 
-    elif query.data == "main_menu":
-        await delete_old(query)
+    elif event.data == b"main":
 
-        await query.message.chat.send_message(
+        await delete_old(event)
+
+        await event.respond(
             "Главное меню",
-            reply_markup=main_menu_keyboard()
+            buttons=kb_main()
         )
 
-    elif query.data == "profile":
-        await delete_old(query)
+    # ==================================================
+    # ПРОФИЛЬ
+    # ==================================================
 
-        username = query.from_user.first_name
-        tag = query.from_user.username or "Нет"
+    elif event.data == b"profile":
+
+        await delete_old(event)
+
+        username = user.first_name or "User"
+        tag = user.username or "Нет"
 
         text = (
+            f"Твой профиль {username}\n\n"
+
             f"👨‍🦱 Твой профиль {username}\n\n"
+
             f"🏆 Статистика:\n"
             f"- Твоя касса: {data['cash']}$\n"
             f"- Кол-во профитов: {data['profits']} профитов\n"
             f"- Кол-во локов: {data['locks']} локов\n"
             f"- Место в топе: N/A\n\n"
+
             f"⚡️ Информация и настройки:\n"
-            f"- Ваш ID: {query.from_user.id}\n"
+            f"- Ваш ID: {user.id}\n"
             f"- Твой тег: @{tag}\n"
             f"- Статус: Воркер\n"
             f"- Ранг: N/A"
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=back_main_keyboard()
+            buttons=kb_back_main()
         )
 
-    elif query.data == "settings":
-        await delete_old(query)
+    # ==================================================
+    # НАСТРОЙКИ
+    # ==================================================
 
-        await query.message.chat.send_message(
+    elif event.data == b"settings":
+
+        await delete_old(event)
+
+        await event.respond(
             "Выберите нужный пункт",
-            reply_markup=settings_keyboard()
+            buttons=kb_settings()
         )
 
-    elif query.data == "ranks":
-        await delete_old(query)
+    # ==================================================
+    # РАНГИ
+    # ==================================================
+
+    elif event.data == b"ranks":
+
+        await delete_old(event)
 
         text = (
             f"💰 Твоя касса: {data['cash']}$\n\n"
-            f"> 🧑‍🎓Студент - от 0$\n"
+
+            f"> 🧑‍🎓 Студент - от 0$\n"
             f"> 🥇 Чемпион - от 1 000$\n"
             f"> 🐺 Волк - от 3 000$\n"
             f"> 💪 Легенда - от 5 000$\n"
             f"> 🏆 Начальник - от 10 000$"
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Назад", callback_data="settings")]
-            ])
+            buttons=[[Button.inline("Назад", b"settings")]]
         )
 
-    elif query.data == "mode":
-        await delete_old(query)
+    # ==================================================
+    # РЕЖИМ
+    # ==================================================
+
+    elif event.data == b"mode":
+
+        await delete_old(event)
 
         text = (
             "Выберите режим:\n\n"
@@ -381,17 +478,24 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Локаются все устройства от выбранной модели."
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=mode_keyboard()
+            buttons=kb_mode()
         )
 
-    elif query.data.startswith("setmode_"):
-        mode = query.data.replace("setmode_", "")
-        data["mode"] = mode
+    elif event.data in [b"mode11", b"mode12", b"mode13"]:
+
+        mapping = {
+            b"mode11": "От 11",
+            b"mode12": "От 12",
+            b"mode13": "От 13"
+        }
+
+        data["mode"] = mapping[event.data]
+
         save_data(users)
 
-        await delete_old(query)
+        await delete_old(event)
 
         text = (
             "Выберите режим:\n\n"
@@ -399,62 +503,170 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Локаются все устройства от выбранной модели."
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=mode_keyboard()
+            buttons=kb_mode()
         )
 
-    elif query.data == "my_tag":
-        await delete_old(query)
+    # ==================================================
+    # МОЙ ТЕГ
+    # ==================================================
 
-        await query.message.chat.send_message(
+    elif event.data == b"mytag":
+
+        await delete_old(event)
+
+        await event.respond(
             f"Ваш тег: {data['tag']}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Назад", callback_data="settings")]
-            ])
+            buttons=[[Button.inline("Назад", b"settings")]]
         )
 
-    elif query.data == "about":
-        await delete_old(query)
+    # ==================================================
+    # О ПРОЕКТЕ
+    # ==================================================
+
+    elif event.data == b"about":
+
+        await delete_old(event)
 
         text = (
             "🏆 ИНФОРМАЦИЯ О UDD TEAM\n\n"
-            "🚀 Мы работаем с 01.03.2026, за это время сделаны "
-            "631 профитов на сумму 55,374$\n\n"
+
+            "🚀 Мы работаем с 01.03.2026, "
+            "за это время сделаны 631 профитов "
+            "на сумму 55,374$\n\n"
+
             "💰 Выплаты\n"
             "- Обработка: 80%\n"
             "- Сервисы: 50%\n\n"
+
             "⚡️ Состояние работы бота: Ворк!"
         )
 
-        await query.message.chat.send_message(
+        await event.respond(
             text,
-            reply_markup=about_keyboard()
+            buttons=kb_about()
         )
 
-    elif query.data == "apple":
-        await delete_old(query)
+    # ==================================================
+    # APPLE ID ЧЕРЕЗ MTcloud_bot
+    # ==================================================
 
-        await query.message.chat.send_message(
-            "APPLE ID временно недоступны.",
-            reply_markup=back_main_keyboard()
+    elif event.data == b"apple":
+
+        await delete_old(event)
+
+        loading = await event.respond(
+            "Получаем APPLE ID..."
         )
 
+        try:
 
-# =========================
-# Запуск
-# =========================
+            # ==========================================
+            # ПИШЕМ БОТУ
+            # ==========================================
 
-def main():
-    app = Application.builder().token(TOKEN).build()
+            await bot.send_message(
+                TARGET_BOT,
+                "/start"
+            )
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callbacks))
+            await asyncio.sleep(2)
 
-    print("Бот запущен!")
+            # ==========================================
+            # БЕРЕМ ПОСЛЕДНЕЕ СООБЩЕНИЕ
+            # ==========================================
 
-    app.run_polling()
+            messages = await bot.get_messages(
+                TARGET_BOT,
+                limit=1
+            )
+
+            if not messages:
+
+                await loading.edit(
+                    "Не удалось получить сообщение."
+                )
+
+                return
+
+            msg = messages[0]
+
+            # ==========================================
+            # ЖМЕМ КНОПКУ
+            # ==========================================
+
+            clicked = False
+
+            if msg.buttons:
+
+                for row in msg.buttons:
+
+                    for button in row:
+
+                        if "Получить APPLE ID" in button.text:
+
+                            await msg.click(
+                                text=button.text
+                            )
+
+                            clicked = True
+                            break
+
+            if not clicked:
+
+                await loading.edit(
+                    "Кнопка не найдена."
+                )
+
+                return
+
+            await asyncio.sleep(3)
+
+            # ==========================================
+            # БЕРЕМ НОВОЕ СООБЩЕНИЕ
+            # ==========================================
+
+            result = await bot.get_messages(
+                TARGET_BOT,
+                limit=1
+            )
+
+            if not result:
+
+                await loading.edit(
+                    "APPLE ID не получен."
+                )
+
+                return
+
+            final_message = result[0]
+
+            try:
+                await loading.delete()
+            except:
+                pass
+
+            # ==========================================
+            # ПЕРЕСЫЛАЕМ ПОЛЬЗОВАТЕЛЮ
+            # ==========================================
+
+            await bot.forward_messages(
+                event.chat_id,
+                final_message
+            )
+
+        except Exception as e:
+
+            await loading.edit(
+                f"Ошибка:\n{str(e)}"
+            )
 
 
-if __name__ == "__main__":
-    main()
+# ==================================================
+# ЗАПУСК
+# ==================================================
+
+print("UDD BOT STARTED")
+
+bot.run_until_disconnected()
