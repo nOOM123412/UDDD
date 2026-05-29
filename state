@@ -419,13 +419,13 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await delete_old(query)
 
         text = (
-            "ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
-            "Мы работаем с 01.03.2026, за это время сделаны "
+            "🏆 ИНФОРМАЦИЯ О UDD TEAM\n\n"
+            "🚀 Мы работаем с 01.03.2026, за это время сделаны "
             "631 профитов на сумму 55,374$\n\n"
-            "Выплаты\n"
+            "💰 Выплаты\n"
             "- Обработка: 80%\n"
             "- Сервисы: 50%\n\n"
-            "Состояние работы бота: Ворк!"
+            "⚡️ Состояние работы бота: Ворк!"
         )
 
         await query.message.chat.send_message(
