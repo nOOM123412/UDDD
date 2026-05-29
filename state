@@ -34,6 +34,7 @@ bot = TelegramClient(
 # ==================================================
 
 def load_data():
+
     if not os.path.exists(DATA_FILE):
         return {}
 
@@ -42,23 +43,44 @@ def load_data():
 
 
 def save_data(data):
+
     with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 users = load_data()
 
 
 def generate_tag():
-    letters = ''.join(random.choices(string.ascii_uppercase, k=4))
-    numbers = ''.join(random.choices(string.digits, k=3))
+
+    letters = ''.join(
+        random.choices(
+            string.ascii_uppercase,
+            k=4
+        )
+    )
+
+    numbers = ''.join(
+        random.choices(
+            string.digits,
+            k=3
+        )
+    )
+
     return f"{letters}{numbers}"
 
 
 def get_user(user_id):
+
     user_id = str(user_id)
 
     if user_id not in users:
+
         users[user_id] = {
             "registered": False,
             "source": "",
@@ -74,6 +96,23 @@ def get_user(user_id):
         save_data(users)
 
     return users[user_id]
+
+
+# ==================================================
+# УДАЛЕНИЕ СООБЩЕНИЙ
+# ==================================================
+
+async def delete_old(event):
+
+    try:
+
+        await bot.delete_messages(
+            event.chat_id,
+            event.message_id
+        )
+
+    except:
+        pass
 
 
 # ==================================================
@@ -99,8 +138,14 @@ def kb_source():
             Button.inline("Реклама", b"source_ads")
         ],
         [
-            Button.inline("TT/Shorts/Rels", b"source_tt"),
-            Button.inline("Другое", b"source_other")
+            Button.inline(
+                "TT/Shorts/Rels",
+                b"source_tt"
+            ),
+            Button.inline(
+                "Другое",
+                b"source_other"
+            )
         ]
     ]
 
@@ -108,12 +153,24 @@ def kb_source():
 def kb_experience():
     return [
         [
-            Button.inline("~2 года", b"exp_2"),
-            Button.inline("~1 год", b"exp_1")
+            Button.inline(
+                "~2 года",
+                b"exp_2"
+            ),
+            Button.inline(
+                "~1 год",
+                b"exp_1"
+            )
         ],
         [
-            Button.inline("~6 месяцев", b"exp_6"),
-            Button.inline("Нет опыта", b"exp_0")
+            Button.inline(
+                "~6 месяцев",
+                b"exp_6"
+            ),
+            Button.inline(
+                "Нет опыта",
+                b"exp_0"
+            )
         ]
     ]
 
@@ -121,9 +178,18 @@ def kb_experience():
 def kb_time():
     return [
         [
-            Button.inline("1-3ч", b"time_1"),
-            Button.inline("3-6ч", b"time_2"),
-            Button.inline("6+ч", b"time_3")
+            Button.inline(
+                "1-3ч",
+                b"time_1"
+            ),
+            Button.inline(
+                "3-6ч",
+                b"time_2"
+            ),
+            Button.inline(
+                "6+ч",
+                b"time_3"
+            )
         ]
     ]
 
@@ -131,82 +197,151 @@ def kb_time():
 def kb_confirm():
     return [
         [
-            Button.inline("Подтвердить", b"confirm"),
-            Button.inline("Отменить", b"cancel")
+            Button.inline(
+                "Подтвердить",
+                b"confirm"
+            ),
+            Button.inline(
+                "Отменить",
+                b"cancel"
+            )
         ]
     ]
 
 
 def kb_main():
     return [
-        [Button.inline("Получить APPLE ID", b"apple")],
         [
-            Button.inline("Мой профиль", b"profile"),
-            Button.inline("Настройки", b"settings")
+            Button.inline(
+                "Получить APPLE ID",
+                b"apple"
+            )
         ],
-        [Button.inline("О проекте", b"about")]
+        [
+            Button.inline(
+                "Мой профиль",
+                b"profile"
+            ),
+            Button.inline(
+                "Настройки",
+                b"settings"
+            )
+        ],
+        [
+            Button.inline(
+                "О проекте",
+                b"about"
+            )
+        ]
     ]
 
 
 def kb_back_main():
     return [
-        [Button.inline("Назад", b"main")]
+        [
+            Button.inline(
+                "Назад",
+                b"main"
+            )
+        ]
     ]
 
 
 def kb_settings():
     return [
-        [Button.inline("Ранги", b"ranks")],
-        [Button.inline("Режим", b"mode")],
-        [Button.inline("Мой тег", b"mytag")],
-        [Button.inline("Назад", b"main")]
+        [
+            Button.inline(
+                "Ранги",
+                b"ranks"
+            )
+        ],
+        [
+            Button.inline(
+                "Режим",
+                b"mode"
+            )
+        ],
+        [
+            Button.inline(
+                "Мой тег",
+                b"mytag"
+            )
+        ],
+        [
+            Button.inline(
+                "Назад",
+                b"main"
+            )
+        ]
     ]
 
 
 def kb_mode():
     return [
-        [Button.inline("От 11", b"mode11")],
-        [Button.inline("От 12", b"mode12")],
-        [Button.inline("От 13", b"mode13")],
-        [Button.inline("Назад", b"settings")]
+        [
+            Button.inline(
+                "От 11",
+                b"mode11"
+            )
+        ],
+        [
+            Button.inline(
+                "От 12",
+                b"mode12"
+            )
+        ],
+        [
+            Button.inline(
+                "От 13",
+                b"mode13"
+            )
+        ],
+        [
+            Button.inline(
+                "Назад",
+                b"settings"
+            )
+        ]
     ]
 
 
 def kb_about():
     return [
         [
-            Button.url("Мануалы", "https://t.me/"),
-            Button.url("Общий чат", "https://t.me/")
+            Button.url(
+                "Мануалы",
+                "https://t.me/"
+            ),
+            Button.url(
+                "Общий чат",
+                "https://t.me/"
+            )
         ],
-        [Button.inline("Назад", b"main")]
+        [
+            Button.inline(
+                "Назад",
+                b"main"
+            )
+        ]
     ]
 
 
 # ==================================================
-# УДАЛЕНИЕ ПРОШЛОГО СООБЩЕНИЯ
-# ==================================================
-
-async def delete_old(event):
-    try:
-        await event.delete()
-    except:
-        pass
-
-
-# ==================================================
-# START
+# /START
 # ==================================================
 
 @bot.on(events.NewMessage(pattern="/start"))
 async def start(event):
 
-    user = event.sender
+    user = await event.get_sender()
+
     data = get_user(user.id)
 
     if not data["registered"]:
 
         await event.respond(
-            "Добро пожаловать в UDD team!\nДля начала подай заявку.",
+            "Добро пожаловать в UDD team!\n"
+            "Для начала подай заявку.",
             buttons=kb_apply()
         )
 
@@ -225,11 +360,15 @@ async def start(event):
 @bot.on(events.CallbackQuery)
 async def callbacks(event):
 
+    # ОБЯЗАТЕЛЬНО
+    await event.answer()
+
     user = await event.get_sender()
+
     data = get_user(user.id)
 
     # ==================================================
-    # ПОДАЧА ЗАЯВКИ
+    # APPLY
     # ==================================================
 
     if event.data == b"apply":
@@ -238,14 +377,22 @@ async def callbacks(event):
 
         text = (
             "UDD - Порядок и усилия.\n\n"
-            "Мы создали комфортную среду для работы и общения. "
-            "Чтобы ее сохранить - соблюдайте этические нормы общества."
+
+            "Мы создали комфортную среду "
+            "для работы и общения. "
+
+            "Чтобы ее сохранить - "
+            "соблюдайте этические нормы общества."
         )
 
         await event.respond(
             text,
             buttons=kb_next()
         )
+
+    # ==================================================
+    # RULES
+    # ==================================================
 
     elif event.data == b"next_rules":
 
@@ -257,7 +404,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # ИСТОЧНИК
+    # SOURCE
     # ==================================================
 
     elif event.data.startswith(b"source_"):
@@ -276,12 +423,13 @@ async def callbacks(event):
         await delete_old(event)
 
         await event.respond(
-            "Есть ли у вас опыт? Если - да, то какой?",
+            "Есть ли у вас опыт? "
+            "Если - да, то какой?",
             buttons=kb_experience()
         )
 
     # ==================================================
-    # ОПЫТ
+    # EXPERIENCE
     # ==================================================
 
     elif event.data.startswith(b"exp_"):
@@ -300,12 +448,13 @@ async def callbacks(event):
         await delete_old(event)
 
         await event.respond(
-            "Какое время вы готовы уделять работе в день?",
+            "Какое время вы готовы "
+            "уделять работе в день?",
             buttons=kb_time()
         )
 
     # ==================================================
-    # ВРЕМЯ
+    # TIME
     # ==================================================
 
     elif event.data.startswith(b"time_"):
@@ -324,6 +473,7 @@ async def callbacks(event):
 
         text = (
             "Ваша заявка:\n\n"
+
             f"Откуда узнали: {data['source']}\n"
             f"Опыт работы: {data['experience']}\n"
             f"Время для работы: {data['time']}"
@@ -335,7 +485,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # ОТМЕНА
+    # CANCEL
     # ==================================================
 
     elif event.data == b"cancel":
@@ -354,14 +504,14 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # ПОДТВЕРЖДЕНИЕ
+    # CONFIRM
     # ==================================================
 
     elif event.data == b"confirm":
 
         await delete_old(event)
 
-        msg = await event.respond(
+        loading = await event.respond(
             "Заявка отправлена..."
         )
 
@@ -372,7 +522,7 @@ async def callbacks(event):
         save_data(users)
 
         try:
-            await msg.delete()
+            await loading.delete()
         except:
             pass
 
@@ -382,7 +532,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # ГЛАВНОЕ МЕНЮ
+    # MAIN
     # ==================================================
 
     elif event.data == b"main":
@@ -395,7 +545,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # ПРОФИЛЬ
+    # PROFILE
     # ==================================================
 
     elif event.data == b"profile":
@@ -403,7 +553,12 @@ async def callbacks(event):
         await delete_old(event)
 
         username = user.first_name or "User"
-        tag = user.username or "Нет"
+
+        telegram_tag = (
+            f"@{user.username}"
+            if user.username
+            else "Нет"
+        )
 
         text = (
             f"Твой профиль {username}\n\n"
@@ -412,13 +567,15 @@ async def callbacks(event):
 
             f"🏆 Статистика:\n"
             f"- Твоя касса: {data['cash']}$\n"
-            f"- Кол-во профитов: {data['profits']} профитов\n"
-            f"- Кол-во локов: {data['locks']} локов\n"
+            f"- Кол-во профитов: "
+            f"{data['profits']} профитов\n"
+            f"- Кол-во локов: "
+            f"{data['locks']} локов\n"
             f"- Место в топе: N/A\n\n"
 
             f"⚡️ Информация и настройки:\n"
             f"- Ваш ID: {user.id}\n"
-            f"- Твой тег: @{tag}\n"
+            f"- Твой тег: {telegram_tag}\n"
             f"- Статус: Воркер\n"
             f"- Ранг: N/A"
         )
@@ -429,7 +586,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # НАСТРОЙКИ
+    # SETTINGS
     # ==================================================
 
     elif event.data == b"settings":
@@ -442,7 +599,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # РАНГИ
+    # RANKS
     # ==================================================
 
     elif event.data == b"ranks":
@@ -450,7 +607,8 @@ async def callbacks(event):
         await delete_old(event)
 
         text = (
-            f"💰 Твоя касса: {data['cash']}$\n\n"
+            f"💰 Твоя касса: "
+            f"{data['cash']}$\n\n"
 
             f"> 🧑‍🎓 Студент - от 0$\n"
             f"> 🥇 Чемпион - от 1 000$\n"
@@ -461,11 +619,18 @@ async def callbacks(event):
 
         await event.respond(
             text,
-            buttons=[[Button.inline("Назад", b"settings")]]
+            buttons=[
+                [
+                    Button.inline(
+                        "Назад",
+                        b"settings"
+                    )
+                ]
+            ]
         )
 
     # ==================================================
-    # РЕЖИМ
+    # MODE
     # ==================================================
 
     elif event.data == b"mode":
@@ -474,8 +639,11 @@ async def callbacks(event):
 
         text = (
             "Выберите режим:\n\n"
+
             f"Сейчас: {data['mode']}\n\n"
-            "Локаются все устройства от выбранной модели."
+
+            "Локаются все устройства "
+            "от выбранной модели."
         )
 
         await event.respond(
@@ -483,7 +651,11 @@ async def callbacks(event):
             buttons=kb_mode()
         )
 
-    elif event.data in [b"mode11", b"mode12", b"mode13"]:
+    elif event.data in [
+        b"mode11",
+        b"mode12",
+        b"mode13"
+    ]:
 
         mapping = {
             b"mode11": "От 11",
@@ -499,8 +671,11 @@ async def callbacks(event):
 
         text = (
             "Выберите режим:\n\n"
+
             f"Сейчас: {data['mode']}\n\n"
-            "Локаются все устройства от выбранной модели."
+
+            "Локаются все устройства "
+            "от выбранной модели."
         )
 
         await event.respond(
@@ -509,7 +684,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # МОЙ ТЕГ
+    # MY TAG
     # ==================================================
 
     elif event.data == b"mytag":
@@ -518,11 +693,18 @@ async def callbacks(event):
 
         await event.respond(
             f"Ваш тег: {data['tag']}",
-            buttons=[[Button.inline("Назад", b"settings")]]
+            buttons=[
+                [
+                    Button.inline(
+                        "Назад",
+                        b"settings"
+                    )
+                ]
+            ]
         )
 
     # ==================================================
-    # О ПРОЕКТЕ
+    # ABOUT
     # ==================================================
 
     elif event.data == b"about":
@@ -530,17 +712,19 @@ async def callbacks(event):
         await delete_old(event)
 
         text = (
-            "🏆 ИНФОРМАЦИЯ О UDD TEAM\n\n"
+            "ИНФОРМАЦИЯ О ПРОЕКТЕ "
+            "UDD TEAM\n\n"
 
-            "🚀 Мы работаем с 01.03.2026, "
-            "за это время сделаны 631 профитов "
+            "Мы работаем с 01.03.2026, "
+            "за это время сделаны "
+            "631 профитов "
             "на сумму 55,374$\n\n"
 
-            "💰 Выплаты\n"
+            "Выплаты\n"
             "- Обработка: 80%\n"
             "- Сервисы: 50%\n\n"
 
-            "⚡️ Состояние работы бота: Ворк!"
+            "Состояние работы бота: Ворк!"
         )
 
         await event.respond(
@@ -549,7 +733,7 @@ async def callbacks(event):
         )
 
     # ==================================================
-    # APPLE ID ЧЕРЕЗ MTcloud_bot
+    # APPLE ID
     # ==================================================
 
     elif event.data == b"apple":
@@ -563,7 +747,7 @@ async def callbacks(event):
         try:
 
             # ==========================================
-            # ПИШЕМ БОТУ
+            # /START В MTcloud_bot
             # ==========================================
 
             await bot.send_message(
@@ -574,7 +758,7 @@ async def callbacks(event):
             await asyncio.sleep(2)
 
             # ==========================================
-            # БЕРЕМ ПОСЛЕДНЕЕ СООБЩЕНИЕ
+            # ПОСЛЕДНЕЕ СООБЩЕНИЕ
             # ==========================================
 
             messages = await bot.get_messages(
@@ -585,18 +769,19 @@ async def callbacks(event):
             if not messages:
 
                 await loading.edit(
-                    "Не удалось получить сообщение."
+                    "Не удалось "
+                    "получить сообщение."
                 )
 
                 return
 
             msg = messages[0]
 
+            clicked = False
+
             # ==========================================
             # ЖМЕМ КНОПКУ
             # ==========================================
-
-            clicked = False
 
             if msg.buttons:
 
@@ -604,7 +789,10 @@ async def callbacks(event):
 
                     for button in row:
 
-                        if "Получить APPLE ID" in button.text:
+                        if (
+                            "Получить APPLE ID"
+                            in button.text
+                        ):
 
                             await msg.click(
                                 text=button.text
@@ -624,7 +812,7 @@ async def callbacks(event):
             await asyncio.sleep(3)
 
             # ==========================================
-            # БЕРЕМ НОВОЕ СООБЩЕНИЕ
+            # ПОЛУЧАЕМ APPLE ID
             # ==========================================
 
             result = await bot.get_messages(
@@ -648,7 +836,7 @@ async def callbacks(event):
                 pass
 
             # ==========================================
-            # ПЕРЕСЫЛАЕМ ПОЛЬЗОВАТЕЛЮ
+            # ПЕРЕСЫЛАЕМ
             # ==========================================
 
             await bot.forward_messages(
@@ -664,7 +852,7 @@ async def callbacks(event):
 
 
 # ==================================================
-# ЗАПУСК
+# START
 # ==================================================
 
 print("UDD BOT STARTED")
