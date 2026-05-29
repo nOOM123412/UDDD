@@ -166,8 +166,8 @@ def mode_keyboard():
 def about_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Мануалы", url="https://t.me/"),
-            InlineKeyboardButton("Общий чат", url="https://t.me/")
+            InlineKeyboardButton("Мануалы", url="https://t.me/UDD_man"),
+            InlineKeyboardButton("Общий чат", url="https://t.me/+_4Z8Ri03Yw4yNzVi")
         ],
         [InlineKeyboardButton("Назад", callback_data="main_menu")]
     ])
