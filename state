@@ -327,7 +327,6 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tag = query.from_user.username or "Нет"
 
         text = (
-            f"Твой профиль {username}\n\n"
             f"👨‍🦱 Твой профиль {username}\n\n"
             f"🏆 Статистика:\n"
             f"- Твоя касса: {data['cash']}$\n"
