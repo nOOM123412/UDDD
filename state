@@ -1,431 +1,461 @@
-# pip install pyTelegramBotAPI
+import asyncio
+import json
+import os
+import random
+import string
 
-import telebot
-from telebot import types
-import time
-import threading
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Update,
+)
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+)
 
 TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
 
-bot = telebot.TeleBot(TOKEN)
-
-# Хранилище пользователей
-users = {}
-
-# Данные профилей
-profiles = {}
-
-# Проверка первого входа
-def is_new_user(user_id):
-    return user_id not in users
+DATA_FILE = "users.json"
 
 
-# Удаление предыдущего сообщения
-def delete_previous(call):
+# =========================
+# Работа с данными
+# =========================
+
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {}
+
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+users = load_data()
+
+
+def generate_tag():
+    letters = ''.join(random.choices(string.ascii_uppercase, k=4))
+    numbers = ''.join(random.choices(string.digits, k=3))
+    return f"{letters}{numbers}"
+
+
+def get_user(user_id):
+    user_id = str(user_id)
+
+    if user_id not in users:
+        users[user_id] = {
+            "registered": False,
+            "source": "",
+            "experience": "",
+            "time": "",
+            "cash": 0,
+            "profits": 0,
+            "locks": 0,
+            "mode": "От 11",
+            "tag": generate_tag(),
+        }
+        save_data(users)
+
+    return users[user_id]
+
+
+# =========================
+# Кнопки
+# =========================
+
+def start_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Подать заявку", callback_data="apply")]
+    ])
+
+
+def next_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Дальше", callback_data="next_rules")]
+    ])
+
+
+def source_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("От друга", callback_data="source_От друга"),
+            InlineKeyboardButton("Реклама", callback_data="source_Реклама")
+        ],
+        [
+            InlineKeyboardButton("TT/Shorts/Rels", callback_data="source_TT/Shorts/Rels"),
+            InlineKeyboardButton("Другое", callback_data="source_Другое")
+        ]
+    ])
+
+
+def experience_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("~2 года", callback_data="exp_~2 года"),
+            InlineKeyboardButton("~1 год", callback_data="exp_~1 год")
+        ],
+        [
+            InlineKeyboardButton("~6 месяцев", callback_data="exp_~6 месяцев"),
+            InlineKeyboardButton("Нет опыта", callback_data="exp_Нет опыта")
+        ]
+    ])
+
+
+def time_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("1-3ч", callback_data="time_1-3ч"),
+            InlineKeyboardButton("3-6ч", callback_data="time_3-6ч"),
+            InlineKeyboardButton("6+ч", callback_data="time_6+ч")
+        ]
+    ])
+
+
+def confirm_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Подтвердить", callback_data="confirm"),
+            InlineKeyboardButton("Отменить", callback_data="cancel")
+        ]
+    ])
+
+
+def main_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Получить APPLE ID", callback_data="apple")],
+        [
+            InlineKeyboardButton("Мой профиль", callback_data="profile"),
+            InlineKeyboardButton("Настройки", callback_data="settings")
+        ],
+        [InlineKeyboardButton("О проекте", callback_data="about")]
+    ])
+
+
+def back_main_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Назад", callback_data="main_menu")]
+    ])
+
+
+def settings_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Ранги", callback_data="ranks")],
+        [InlineKeyboardButton("Режим", callback_data="mode")],
+        [InlineKeyboardButton("Мой тег", callback_data="my_tag")],
+        [InlineKeyboardButton("Назад", callback_data="main_menu")]
+    ])
+
+
+def mode_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("От 11", callback_data="setmode_От 11")],
+        [InlineKeyboardButton("От 12", callback_data="setmode_От 12")],
+        [InlineKeyboardButton("От 13", callback_data="setmode_От 13")],
+        [InlineKeyboardButton("Назад", callback_data="settings")]
+    ])
+
+
+def about_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Мануалы", url="https://t.me/"),
+            InlineKeyboardButton("Общий чат", url="https://t.me/")
+        ],
+        [InlineKeyboardButton("Назад", callback_data="main_menu")]
+    ])
+
+
+# =========================
+# Удаление прошлого сообщения
+# =========================
+
+async def delete_old(query):
     try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+        await query.message.delete()
     except:
         pass
 
 
-# Главное меню
-def send_main_menu(chat_id):
-    markup = types.InlineKeyboardMarkup(row_width=2)
+# =========================
+# /start
+# =========================
 
-    btn1 = types.InlineKeyboardButton("Получить APPLE ID", callback_data="apple")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    data = get_user(user.id)
 
-    btn2 = types.InlineKeyboardButton("Мой профиль", callback_data="profile")
-    btn3 = types.InlineKeyboardButton("Настройки", callback_data="settings")
-
-    btn4 = types.InlineKeyboardButton("О проекте", callback_data="about")
-
-    markup.add(btn1)
-    markup.row(btn2, btn3)
-    markup.add(btn4)
-
-    bot.send_message(chat_id, "Добро пожаловать!", reply_markup=markup)
-
-
-# START
-@bot.message_handler(commands=['start'])
-def start(message):
-    user_id = message.from_user.id
-
-    if is_new_user(user_id):
-
-        users[user_id] = {
-            "source": "",
-            "experience": "",
-            "time": "",
-            "mode": "От 11"
-        }
-
-        profiles[user_id] = {
-            "cash": 0,
-            "profits": 0,
-            "locks": 0
-        }
-
-        markup = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton(
-            "Подать заявку",
-            callback_data="apply"
-        )
-        markup.add(btn)
-
-        bot.send_message(
-            message.chat.id,
+    if not data["registered"]:
+        await update.message.reply_text(
             "Добро пожаловать в UDD team!\nДля начала подай заявку.",
-            reply_markup=markup
+            reply_markup=start_keyboard()
+        )
+    else:
+        await update.message.reply_text(
+            "Добро пожаловать!",
+            reply_markup=main_menu_keyboard()
         )
 
-    else:
-        send_main_menu(message.chat.id)
 
+# =========================
+# Callback
+# =========================
 
-# Подать заявку
-@bot.callback_query_handler(func=lambda call: call.data == "apply")
-def apply(call):
-    delete_previous(call)
+async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-    markup = types.InlineKeyboardMarkup()
-    btn = types.InlineKeyboardButton("Дальше", callback_data="next_rules")
-    markup.add(btn)
+    user_id = str(query.from_user.id)
+    data = get_user(user_id)
 
-    text = (
-        "UDD - Порядок и усилия.\n\n"
-        "Мы создали комфортную среду для работы и общения. "
-        "Чтобы еe сохранить - соблюдайте этические нормы общества."
-    )
+    # =====================
+    # Заявка
+    # =====================
 
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+    if query.data == "apply":
+        await delete_old(query)
 
-
-# Вопрос 1
-@bot.callback_query_handler(func=lambda call: call.data == "next_rules")
-def ask_source(call):
-    delete_previous(call)
+        text = (
+            "UDD - Порядок и усилия.\n\n"
+            "Мы создали комфортную среду для работы и общения. "
+            "Чтобы еe сохранить - соблюдайте этические нормы общества."
+        )
 
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    buttons = [
-        ("От друга", "src_friend"),
-        ("Реклама", "src_ads"),
-        ("TT/Shorts/Rels", "src_tt"),
-        ("Другое", "src_other")
-    ]
-
-    for text, data in buttons:
-        markup.add(types.InlineKeyboardButton(text, callback_data=data))
-
-    bot.send_message(
-        call.message.chat.id,
-        "Откуда вы о нас узнали?",
-        reply_markup=markup
-    )
-
-
-# Выбор источника
-@bot.callback_query_handler(func=lambda call: call.data.startswith("src_"))
-def select_source(call):
-    delete_previous(call)
-
-    source_map = {
-        "src_friend": "От друга",
-        "src_ads": "Реклама",
-        "src_tt": "TT/Shorts/Rels",
-        "src_other": "Другое"
-    }
-
-    users[call.from_user.id]["source"] = source_map[call.data]
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    buttons = [
-        ("~2 года", "exp_2"),
-        ("~1 год", "exp_1"),
-        ("~6 месяцев", "exp_6"),
-        ("Нет опыта", "exp_0")
-    ]
-
-    for text, data in buttons:
-        markup.add(types.InlineKeyboardButton(text, callback_data=data))
-
-    bot.send_message(
-        call.message.chat.id,
-        "Есть ли у вас опыт? Если - да, то какой?",
-        reply_markup=markup
-    )
-
-
-# Выбор опыта
-@bot.callback_query_handler(func=lambda call: call.data.startswith("exp_"))
-def select_exp(call):
-    delete_previous(call)
-
-    exp_map = {
-        "exp_2": "~2 года",
-        "exp_1": "~1 год",
-        "exp_6": "~6 месяцев",
-        "exp_0": "Нет опыта"
-    }
-
-    users[call.from_user.id]["experience"] = exp_map[call.data]
-
-    markup = types.InlineKeyboardMarkup(row_width=3)
-
-    buttons = [
-        ("1-3ч", "time_1"),
-        ("3-6ч", "time_2"),
-        ("6+ч", "time_3")
-    ]
-
-    for text, data in buttons:
-        markup.add(types.InlineKeyboardButton(text, callback_data=data))
-
-    bot.send_message(
-        call.message.chat.id,
-        "Какое время вы готовы уделять работе в день?",
-        reply_markup=markup
-    )
-
-
-# Выбор времени
-@bot.callback_query_handler(func=lambda call: call.data.startswith("time_"))
-def select_time(call):
-    delete_previous(call)
-
-    time_map = {
-        "time_1": "1-3ч",
-        "time_2": "3-6ч",
-        "time_3": "6+ч"
-    }
-
-    users[call.from_user.id]["time"] = time_map[call.data]
-
-    user = users[call.from_user.id]
-
-    text = (
-        f"Ваша заявка:\n\n"
-        f"Откуда узнали: {user['source']}\n"
-        f"Опыт работы: {user['experience']}\n"
-        f"Время для работы: {user['time']}"
-    )
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    btn1 = types.InlineKeyboardButton(
-        "Подтвердить",
-        callback_data="confirm"
-    )
-
-    btn2 = types.InlineKeyboardButton(
-        "Отменить",
-        callback_data="cancel"
-    )
-
-    markup.add(btn1, btn2)
-
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
-
-# Отмена
-@bot.callback_query_handler(func=lambda call: call.data == "cancel")
-def cancel(call):
-    delete_previous(call)
-
-    ask_source(call)
-
-
-# Подтверждение
-@bot.callback_query_handler(func=lambda call: call.data == "confirm")
-def confirm(call):
-    delete_previous(call)
-
-    msg = bot.send_message(
-        call.message.chat.id,
-        "Заявка отправлена..."
-    )
-
-    def delayed():
-        time.sleep(7)
-
-        try:
-            bot.delete_message(call.message.chat.id, msg.message_id)
-        except:
-            pass
-
-        send_main_menu(call.message.chat.id)
-
-    threading.Thread(target=delayed).start()
-
-
-# Профиль
-@bot.callback_query_handler(func=lambda call: call.data == "profile")
-def profile(call):
-    delete_previous(call)
-
-    user_id = call.from_user.id
-    username = call.from_user.first_name
-
-    profile_data = profiles[user_id]
-
-    text = (
-        f"Твой профиль ({username})\n\n"
-        f"Статистика:\n"
-        f"- Твоя касса: {profile_data['cash']}$\n"
-        f"- Кол-во профитов: {profile_data['profits']} профитов\n"
-        f"- Кол-во локов: {profile_data['locks']} локов\n"
-        f"- Место в топе: N/A\n\n"
-        f"Информация и настройки\n"
-        f"- Ваш ID: {user_id}\n"
-        f"- Статус: Воркер\n"
-        f"- Ранг: N/A"
-    )
-
-    markup = types.InlineKeyboardMarkup()
-    btn = types.InlineKeyboardButton("Назад", callback_data="back_main")
-    markup.add(btn)
-
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
-
-# Настройки
-@bot.callback_query_handler(func=lambda call: call.data == "settings")
-def settings(call):
-    delete_previous(call)
-
-    markup = types.InlineKeyboardMarkup()
-
-    btn1 = types.InlineKeyboardButton("Ранги", callback_data="ranks")
-    btn2 = types.InlineKeyboardButton("Режим", callback_data="mode")
-
-    markup.add(btn1)
-    markup.add(btn2)
-
-    bot.send_message(
-        call.message.chat.id,
-        "Выберите нужный пункт",
-        reply_markup=markup
-    )
-
-
-# Ранги
-@bot.callback_query_handler(func=lambda call: call.data == "ranks")
-def ranks(call):
-    delete_previous(call)
-
-    cash = profiles[call.from_user.id]["cash"]
-
-    text = (
-        f"Твоя касса: {cash}$\n\n"
-        f"Студент - от 0$\n"
-        f"Чемпион - от 1 000$\n"
-        f"Волк - от 3 000$\n"
-        f"Легенда - от 5 000$\n"
-        f"Начальник - от 10 000$"
-    )
-
-    markup = types.InlineKeyboardMarkup()
-    btn = types.InlineKeyboardButton(
-        "Назад",
-        callback_data="settings"
-    )
-    markup.add(btn)
-
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
-
-# Режим
-@bot.callback_query_handler(func=lambda call: call.data == "mode")
-def mode(call):
-    delete_previous(call)
-
-    current_mode = users[call.from_user.id]["mode"]
-
-    text = (
-        f"Выберите режим:\n\n"
-        f"Сейчас: {current_mode}\n\n"
-        f"Локаются все устройства от выбранной модели."
-    )
-
-    markup = types.InlineKeyboardMarkup()
-
-    modes = [
-        ("От 11", "set_11"),
-        ("От 12", "set_12"),
-        ("От 13", "set_13")
-    ]
-
-    for text_btn, data in modes:
-        markup.add(types.InlineKeyboardButton(text_btn, callback_data=data))
-
-    markup.add(types.InlineKeyboardButton(
-        "Назад",
-        callback_data="settings"
-    ))
-
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
-
-# Смена режима
-@bot.callback_query_handler(func=lambda call: call.data.startswith("set_"))
-def set_mode(call):
-    mode_map = {
-        "set_11": "От 11",
-        "set_12": "От 12",
-        "set_13": "От 13"
-    }
-
-    users[call.from_user.id]["mode"] = mode_map[call.data]
-
-    mode(call)
-
-
-# О проекте
-@bot.callback_query_handler(func=lambda call: call.data == "about")
-def about(call):
-    delete_previous(call)
-
-    text = (
-        "ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
-        "Мы работаем с 01.03.2026, за это время "
-        "сделаны 631 профитов на сумму 55,374$\n\n"
-        "Выплаты\n"
-        "- Обработка: 80%\n"
-        "- Сервисы: 50%\n\n"
-        "Состояние работы бота: Ворк!"
-    )
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    btn1 = types.InlineKeyboardButton(
-        "Мануалы",
-        url="https://t.me/"
-    )
-
-    btn2 = types.InlineKeyboardButton(
-        "Общий чат",
-        url="https://t.me/"
-    )
-
-    btn3 = types.InlineKeyboardButton(
-        "Назад",
-        callback_data="back_main"
-    )
-
-    markup.add(btn1, btn2)
-    markup.add(btn3)
-
-    bot.send_message(call.message.chat.id, text, reply_markup=markup)
-
-
-# Назад в главное меню
-@bot.callback_query_handler(func=lambda call: call.data == "back_main")
-def back_main(call):
-    delete_previous(call)
-    send_main_menu(call.message.chat.id)
-
-
-print("Бот запущен...")
-bot.infinity_polling()
+        await query.message.chat.send_message(
+            text,
+            reply_markup=next_keyboard()
+        )
+
+    elif query.data == "next_rules":
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Откуда вы о нас узнали?",
+            reply_markup=source_keyboard()
+        )
+
+    elif query.data.startswith("source_"):
+        data["source"] = query.data.replace("source_", "")
+        save_data(users)
+
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Есть ли у вас опыт? Если - да, то какой?",
+            reply_markup=experience_keyboard()
+        )
+
+    elif query.data.startswith("exp_"):
+        data["experience"] = query.data.replace("exp_", "")
+        save_data(users)
+
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Какое время вы готовы уделять работе в день?",
+            reply_markup=time_keyboard()
+        )
+
+    elif query.data.startswith("time_"):
+        data["time"] = query.data.replace("time_", "")
+        save_data(users)
+
+        await delete_old(query)
+
+        text = (
+            "Ваша заявка:\n\n"
+            f"Откуда узнали: {data['source']}\n"
+            f"Опыт работы: {data['experience']}\n"
+            f"Время для работы: {data['time']}"
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=confirm_keyboard()
+        )
+
+    elif query.data == "cancel":
+        data["source"] = ""
+        data["experience"] = ""
+        data["time"] = ""
+        save_data(users)
+
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Откуда вы о нас узнали?",
+            reply_markup=source_keyboard()
+        )
+
+    elif query.data == "confirm":
+        await delete_old(query)
+
+        await query.message.chat.send_message("Заявка отправлена...")
+        await asyncio.sleep(7)
+
+        data["registered"] = True
+        save_data(users)
+
+        await query.message.chat.send_message(
+            "Добро пожаловать!",
+            reply_markup=main_menu_keyboard()
+        )
+
+    # =====================
+    # Главное меню
+    # =====================
+
+    elif query.data == "main_menu":
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Главное меню",
+            reply_markup=main_menu_keyboard()
+        )
+
+    elif query.data == "profile":
+        await delete_old(query)
+
+        username = query.from_user.first_name
+        tag = query.from_user.username or "Нет"
+
+        text = (
+            f"Твой профиль {username}\n\n"
+            f"👨‍🦱 Твой профиль {username}\n\n"
+            f"🏆 Статистика:\n"
+            f"- Твоя касса: {data['cash']}$\n"
+            f"- Кол-во профитов: {data['profits']} профитов\n"
+            f"- Кол-во локов: {data['locks']} локов\n"
+            f"- Место в топе: N/A\n\n"
+            f"⚡️ Информация и настройки:\n"
+            f"- Ваш ID: {query.from_user.id}\n"
+            f"- Твой тег: @{tag}\n"
+            f"- Статус: Воркер\n"
+            f"- Ранг: N/A"
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=back_main_keyboard()
+        )
+
+    elif query.data == "settings":
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "Выберите нужный пункт",
+            reply_markup=settings_keyboard()
+        )
+
+    elif query.data == "ranks":
+        await delete_old(query)
+
+        text = (
+            f"💰 Твоя касса: {data['cash']}$\n\n"
+            f"> 🧑‍🎓Студент - от 0$\n"
+            f"> 🥇 Чемпион - от 1 000$\n"
+            f"> 🐺 Волк - от 3 000$\n"
+            f"> 💪 Легенда - от 5 000$\n"
+            f"> 🏆 Начальник - от 10 000$"
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Назад", callback_data="settings")]
+            ])
+        )
+
+    elif query.data == "mode":
+        await delete_old(query)
+
+        text = (
+            "Выберите режим:\n\n"
+            f"Сейчас: {data['mode']}\n\n"
+            "Локаются все устройства от выбранной модели."
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=mode_keyboard()
+        )
+
+    elif query.data.startswith("setmode_"):
+        mode = query.data.replace("setmode_", "")
+        data["mode"] = mode
+        save_data(users)
+
+        await delete_old(query)
+
+        text = (
+            "Выберите режим:\n\n"
+            f"Сейчас: {data['mode']}\n\n"
+            "Локаются все устройства от выбранной модели."
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=mode_keyboard()
+        )
+
+    elif query.data == "my_tag":
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            f"Ваш тег: {data['tag']}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Назад", callback_data="settings")]
+            ])
+        )
+
+    elif query.data == "about":
+        await delete_old(query)
+
+        text = (
+            "ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
+            "Мы работаем с 01.03.2026, за это время сделаны "
+            "631 профитов на сумму 55,374$\n\n"
+            "Выплаты\n"
+            "- Обработка: 80%\n"
+            "- Сервисы: 50%\n\n"
+            "Состояние работы бота: Ворк!"
+        )
+
+        await query.message.chat.send_message(
+            text,
+            reply_markup=about_keyboard()
+        )
+
+    elif query.data == "apple":
+        await delete_old(query)
+
+        await query.message.chat.send_message(
+            "APPLE ID временно недоступны.",
+            reply_markup=back_main_keyboard()
+        )
+
+
+# =========================
+# Запуск
+# =========================
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(callbacks))
+
+    print("Бот запущен!")
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
