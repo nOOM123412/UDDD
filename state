@@ -201,7 +201,7 @@ async def process_ranks(callback: types.CallbackQuery):
 
     ranks_text = (
         "💰 Твоя касса: 0$\n\n"
-        "Студент — от 0$\n"
+        "• Студент — от 0$\n"
         "• Чемпион — от 1 000$\n"
         "• Волк — от 3 000$\n"
         "• Легенда — от 5 000$\n"
