@@ -1,32 +1,373 @@
-import subprocess
-import sys
+import asyncio
+from datetime import datetime
+import json
+import logging
+import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-try:
-    from telethon import TelegramClient
+# Токен вашего бота (получить у @BotFather)
+TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
+DB_FILE = "users_db.json"
 
-except:
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
 
-    subprocess.check_call([
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "telethon"
-    ])
+# Инициализация бота и диспетчера
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
-    from telethon import TelegramClient
 
-API_ID = 12345678
-API_HASH = "YOUR_API_HASH"
+# --- База данных на JSON для хранения данных пользователей ---
+def load_db():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-client = TelegramClient(
-    "udd_user_session",
-    API_ID,
-    API_HASH
-)
 
-client.start()
+def save_db(data):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-print("SUCCESS")
 
-client.run_until_disconnected()
+def register_user(user_id: int):
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str not in db:
+        # По умолчанию ставим режим "от iPhone 13"
+        db[uid_str] = {
+            "reg_date": datetime.now().strftime("%Y-%m-%d"),
+            "mode": "от iPhone 13",
+        }
+        save_db(db)
+
+
+def get_days_in_team(user_id: int) -> int:
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str in db:
+        reg_date_str = db[uid_str]["reg_date"]
+        reg_date = datetime.strptime(reg_date_str, "%Y-%m-%d")
+        delta = datetime.now() - reg_date
+        return max(0, delta.days)
+    return 0
+
+
+def get_user_mode(user_id: int) -> str:
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str in db and "mode" in db[uid_str]:
+        return db[uid_str]["mode"]
+    return "от iPhone 13"  # Запасной вариант
+
+
+def update_user_mode(user_id: int, new_mode: str):
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str in db:
+        db[uid_str]["mode"] = new_mode
+        save_db(db)
+
+
+# --- Клавиатуры ---
+def get_main_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(
+            text="Получить APPLE ID", callback_data="get_apple_id"
+        )
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Мой профиль", callback_data="profile")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Настройки", callback_data="settings")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="О проекте", callback_data="about")
+    )
+    builder.adjust(1, 2, 1)
+    return builder.as_markup()
+
+
+def get_back_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
+    )
+    return builder.as_markup()
+
+
+# --- Обработчики ---
+
+
+# Команда /start
+@dp.message(CommandStart())
+async def cmd_start(message: types.Message):
+    register_user(message.from_user.id)
+    await message.answer(
+        text="В связи с набором состава, модерация заявок временно отключена!"
+    )
+    await message.answer(
+        text="👋Добро пожаловать!", reply_markup=get_main_keyboard()
+    )
+
+
+# Кнопка "Получить APPLE ID"
+@dp.callback_query(lambda c: c.data == "get_apple_id")
+async def process_get_apple_id(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(
+            text="Написать оператору", url="https://t.me/UDD_bog"
+        )
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
+    )
+    builder.adjust(1)
+
+    await callback.message.edit_text(
+        text="📣Для получения аккаунта Apple ID обратитесь к оператору.",
+        reply_markup=builder.as_markup(),
+    )
+    await callback.answer()
+
+
+# Кнопка "Мой профиль"
+@dp.callback_query(lambda c: c.data == "profile")
+async def process_profile(callback: types.CallbackQuery):
+    user = callback.from_user
+    first_name = user.first_name
+    username = f"@{user.username}" if user.username else "Не установлен"
+    days = get_days_in_team(user.id)
+
+    profile_text = (
+        f"👨‍🦱 Твой профиль {first_name}\n\n"
+        f"🏆 Статистика:\n"
+        f" ┠ Твоя касса: 0 $\n"
+        f" ┠ Кол-во профитов: 0 профитов\n"
+        f" ┠ Кол-во локов: 0 локов\n"
+        f" ┠ Место в топе: N/A\n\n"
+        f"📣 Информация и текущие настройки\n"
+        f" ├ Тег в профитах: {username}\n"
+        f" ├ Статус: Воркер\n"
+        f" ├ Ранг: 🎓 Студент\n\n"
+        f"В команде: {days} дн."
+    )
+
+    await callback.message.edit_text(
+        text=profile_text, reply_markup=get_back_keyboard()
+    )
+    await callback.answer()
+
+
+# Кнопка "Настройки"
+@dp.callback_query(lambda c: c.data == "settings")
+async def process_settings(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Ранги", callback_data="set_ranks")
+    )
+    builder.add(
+        types.InlineKeyboardButton(
+            text="Выплаты", callback_data="set_payments"
+        )
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Режим", callback_data="set_mode")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
+    )
+    builder.adjust(1)
+
+    await callback.message.edit_text(
+        text="⚙️ Выбери нужный пункт настройки:",
+        reply_markup=builder.as_markup(),
+    )
+    await callback.answer()
+
+
+# Кнопка "Ранги" внутри Настроек
+@dp.callback_query(lambda c: c.data == "set_ranks")
+async def process_ranks(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="settings")
+    )
+
+    ranks_text = (
+        "💰 Твоя касса: 0$\n\n"
+        "Студент — от 0$\n"
+        "• Чемпион — от 1 000$\n"
+        "• Волк — от 3 000$\n"
+        "• Легенда — от 5 000$\n"
+        "• Босс — от 10 000$"
+    )
+
+    await callback.message.edit_text(
+        text=ranks_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Кнопка "Выплаты" внутри Настроек
+@dp.callback_query(lambda c: c.data == "set_payments")
+async def process_payments(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(
+            text="CryptoBot", callback_data="pay_cryptobot"
+        )
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="TRC-20", callback_data="pay_trc20")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="BEP-20", callback_data="pay_bep20")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="settings")
+    )
+    builder.adjust(1)
+
+    payments_text = (
+        "💳 Настройка выплат:\n\n"
+        "• Текущий метод выплат: CryptoBot\n\n"
+        "— Выберите метод выплаты:"
+    )
+
+    await callback.message.edit_text(
+        text=payments_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Кнопка "CryptoBot" внутри Выплат
+@dp.callback_query(lambda c: c.data == "pay_cryptobot")
+async def process_cryptobot(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
+    )
+
+    cryptobot_text = (
+        "⚡️ Вы выбрали способ: CryptoBot\n\n"
+        "После профита вам придет чек для активации."
+    )
+
+    await callback.message.edit_text(
+        text=cryptobot_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Кнопка "TRC-20" внутри Выплат
+@dp.callback_query(lambda c: c.data == "pay_trc20")
+async def process_trc20(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
+    )
+
+    trc20_text = "ℹ️ Отправьте ваш адрес в сети TRC-20:"
+
+    await callback.message.edit_text(
+        text=trc20_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Кнопка "BEP-20" внутри Выплат
+@dp.callback_query(lambda c: c.data == "pay_bep20")
+async def process_bep20(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
+    )
+
+    bep20_text = "ℹ️ Отправьте ваш адрес в сети BEP-20:"
+
+    await callback.message.edit_text(
+        text=bep20_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Кнопка "Режим" внутри Настроек
+@dp.callback_query(lambda c: c.data == "set_mode")
+async def process_mode_menu(callback: types.CallbackQuery):
+    # Получаем текущий сохраненный режим воркера
+    current_mode = get_user_mode(callback.from_user.id)
+
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="От 11", callback_data="mode_iphone_11")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="От 12", callback_data="mode_iphone_12")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="От 13", callback_data="mode_iphone_13")
+    )
+    builder.add(
+        types.InlineKeyboardButton(text="Назад", callback_data="settings")
+    )
+    builder.adjust(1)  # Меню вертикальным списком
+
+    mode_text = (
+        f"Сейчас: {current_mode}\n\n"
+        f"Локаются все устройства от выбранной модели и выше."
+    )
+
+    await callback.message.edit_text(
+        text=mode_text, reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+# Обработчик переключения режимов (кнопки От 11, От 12, От 13)
+@dp.callback_query(lambda c: c.data.startswith("mode_iphone_"))
+async def process_change_mode(callback: types.CallbackQuery):
+    # Извлекаем модель из callback_data
+    model_num = callback.data.split("_")[2]
+    new_mode = f"от iPhone {model_num}"
+
+    # Обновляем режим в нашей JSON базе данных
+    update_user_mode(callback.from_user.id, new_mode)
+
+    # Уведомляем пользователя через всплывающее окно
+    await callback.answer(f"Режим успешно изменен на: {new_mode}")
+
+    # Мгновенно обновляем интерфейс, вызывая функцию меню заново
+    await process_mode_menu(callback)
+
+
+# Кнопка "Назад" (возврат в главное меню)
+@dp.callback_query(lambda c: c.data == "back_to_main")
+async def process_back_to_main(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text="👋Добро пожаловать!", reply_markup=get_main_keyboard()
+    )
+    await callback.answer()
+
+
+# Заглушка для кнопки "О проекте"
+@dp.callback_query()
+async def process_other_callbacks(callback: types.CallbackQuery):
+    await callback.answer(
+        text=f"Вы открыли раздел с callback_data: {callback.data}",
+        show_alert=True,
+    )
+
+
+async def main():
+    print("Бот запущен...")
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
