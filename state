@@ -111,7 +111,7 @@ async def cmd_start(message: types.Message):
         text="В связи с набором состава, модерация заявок временно отключена!"
     )
     await message.answer(
-        text="👋Добро пожаловать!", reply_markup=get_main_keyboard()
+        text="👋 Добро пожаловать!", reply_markup=get_main_keyboard()
     )
 
 
@@ -130,7 +130,7 @@ async def process_get_apple_id(callback: types.CallbackQuery):
     builder.adjust(1)
 
     await callback.message.edit_text(
-        text="📣Для получения аккаунта Apple ID обратитесь к оператору.",
+        text="📣 Для получения аккаунта Apple ID обратитесь к оператору.",
         reply_markup=builder.as_markup(),
     )
     await callback.answer()
@@ -383,7 +383,7 @@ async def process_about_project(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "back_to_main")
 async def process_back_to_main(callback: types.CallbackQuery):
     await callback.message.edit_text(
-        text="👋Добро пожаловать!", reply_markup=get_main_keyboard()
+        text="👋 Добро пожаловать!", reply_markup=get_main_keyboard()
     )
     await callback.answer()
 
