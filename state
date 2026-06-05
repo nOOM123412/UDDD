@@ -154,7 +154,7 @@ async def process_directions_subsections(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Назад", callback_data="get_apple_id"))
     
-    text = f"Вы выбрали направление: {callback.data}. Тут пока пусто, либо добавьте свой текст."
+    text = f"Вы выбрали направление: {callback.data}. Тут пока пусто."
     await edit_msg_with_photo(callback, text, PHOTO_NAP, builder.as_markup())
     await callback.answer()
 
@@ -299,8 +299,7 @@ async def process_about_project(callback: types.CallbackQuery):
         "💸 Выплаты\n"
         "┠ Прямой перевод - 85%\n"
         "┖ Сервисы - 75%\n\n"
-        "⚡️ Состояние работы бота:\n"
-        "Ворк"
+        "⚡️ Состояние работы бота: Ворк"
     )
 
     await edit_msg_with_photo(callback, about_text, PHOTO_OPR, builder.as_markup())
