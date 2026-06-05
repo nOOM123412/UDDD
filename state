@@ -18,11 +18,11 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- Пути к вашим фотографиям ---
-PHOTO_MAIN = "MM.png"
-PHOTO_NAP = "NAP.png"
-PHOTO_PRO = "PRO.png"
-PHOTO_NAS = "NAS.png"
-PHOTO_OPR = "OPR.png"
+PHOTO_MAIN = "MM.jpeg"
+PHOTO_NAP = "NAP.jpeg"
+PHOTO_PRO = "PRO.jpeg"
+PHOTO_NAS = "NAS.jpeg"
+PHOTO_OPR = "OPR.jpeg"
 
 
 # --- База данных на JSON ---
