@@ -6,20 +6,26 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+# Добавляем необходимый класс для смены медиафайлов
+from aiogram.types import InputMediaPhoto, FSInputFile
 
-# Токен вашего бота (получить у @BotFather)
 TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
 DB_FILE = "users_db.json"
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и диспетчера
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# --- Пути к вашим фотографиям ---
+PHOTO_MAIN = "MM.png"
+PHOTO_NAP = "NAP.png"
+PHOTO_PRO = "PRO.png"
+PHOTO_NAS = "NAS.png"
+PHOTO_OPR = "OPR.png"
 
-# --- База данных на JSON для хранения данных пользователей ---
+
+# --- База данных на JSON ---
 def load_db():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -36,7 +42,6 @@ def register_user(user_id: int):
     db = load_db()
     uid_str = str(user_id)
     if uid_str not in db:
-        # По умолчанию ставим режим "от iPhone 13"
         db[uid_str] = {
             "reg_date": datetime.now().strftime("%Y-%m-%d"),
             "mode": "от iPhone 13",
@@ -74,72 +79,88 @@ def update_user_mode(user_id: int, new_mode: str):
 # --- Клавиатуры ---
 def get_main_keyboard():
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(
-            text="Направления", callback_data="get_apple_id"
-        )
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Мой профиль", callback_data="profile")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Настройки", callback_data="settings")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="О проекте", callback_data="about")
-    )
+    builder.add(types.InlineKeyboardButton(text="Направления", callback_data="get_apple_id"))
+    builder.add(types.InlineKeyboardButton(text="Мой профиль", callback_data="profile"))
+    builder.add(types.InlineKeyboardButton(text="Настройки", callback_data="settings"))
+    builder.add(types.InlineKeyboardButton(text="О проекте", callback_data="about"))
     builder.adjust(1, 2, 1)
     return builder.as_markup()
 
 
 def get_back_keyboard():
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
-    )
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
     return builder.as_markup()
 
 
-# --- Обработчики ---
+# --- Вспомогательная функция для плавного редактирования фото и текста ---
+async def edit_msg_with_photo(callback: types.CallbackQuery, text: str, photo_path: str, reply_markup):
+    """Обновляет картинку и текст в одном сообщении без его удаления"""
+    if os.path.exists(photo_path):
+        media = InputMediaPhoto(media=FSInputFile(photo_path), caption=text)
+        await callback.message.edit_media(media=media, reply_markup=reply_markup)
+    else:
+        # Если вдруг файла нет, бот просто отредактирует текст, чтобы не падать с ошибкой
+        logging.warning(f"Файл {photo_path} не найден! Отправлен только текст.")
+        try:
+            await callback.message.edit_text(text=text, reply_markup=reply_markup)
+        except Exception:
+            # Если старое сообщение было с фото, edit_text вызовет ошибку, тогда шлем новое
+            await callback.message.answer_photo(photo=FSInputFile(photo_path) if os.path.exists(photo_path) else None, caption=text, reply_markup=reply_markup)
 
+
+# --- Обработчики ---
 
 # Команда /start
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     register_user(message.from_user.id)
-    await message.answer(
-        text="В связи с набором состава, модерация заявок временно отключена!"
-    )
-    await message.answer(
-        text="👋 Добро пожаловать!", reply_markup=get_main_keyboard()
-    )
-
-
-# Кнопка "Получить APPLE ID"
-@dp.callback_query(lambda c: c.data == "get_apple_id")
-async def process_get_apple_id(callback: types.CallbackQuery):
-    builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(
-            text="Fake Н@pko", callback_data="Narko")
+    await message.answer(text="В связи с набором состава, модерация заявок временно отключена!")
+    
+    # Главное меню присылаем с фоткой MM.png через answer_photo
+    if os.path.exists(PHOTO_MAIN):
+        await message.answer_photo(
+            photo=FSInputFile(PHOTO_MAIN),
+            caption="👋 Добро пожаловать!",
+            reply_markup=get_main_keyboard()
         )
-    )
-		builder.add
-				types.InlineKeyboardButton(text="iCloud", callback_data="iCloud")
-		)
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
-    )
-    builder.adjust(1)
+    else:
+        await message.answer(text="👋 Добро пожаловать!", reply_markup=get_main_keyboard())
 
-    await callback.message.edit_text(
-        text="Сейчас доступны 2 направления:",
-        reply_markup=builder.as_markup(),
-    )
+
+# Кнопка "Назад" (возврат в главное меню)
+@dp.callback_query(lambda c: c.data == "back_to_main")
+async def process_back_to_main(callback: types.CallbackQuery):
+    await edit_msg_with_photo(callback, "👋 Добро пожаловать!", PHOTO_MAIN, get_main_keyboard())
     await callback.answer()
 
 
-# Кнопка "Мой профиль"
+# === РАЗДЕЛ: НАПРАВЛЕНИЯ (NAP.png) ===
+
+@dp.callback_query(lambda c: c.data == "get_apple_id")
+async def process_get_apple_id(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Fake Н@pko", callback_data="Narko"))
+    builder.add(types.InlineKeyboardButton(text="iCloud", callback_data="iCloud"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
+    builder.adjust(1)
+
+    await edit_msg_with_photo(callback, "Сейчас доступны 2 направления:", PHOTO_NAP, builder.as_markup())
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data in ["Narko", "iCloud"])
+async def process_directions_subsections(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="get_apple_id"))
+    
+    text = f"Вы выбрали направление: {callback.data}. Тут пока пусто, либо добавьте свой текст."
+    await edit_msg_with_photo(callback, text, PHOTO_NAP, builder.as_markup())
+    await callback.answer()
+
+
+# === РАЗДЕЛ: ПРОФИЛЬ (PRO.png) ===
+
 @dp.callback_query(lambda c: c.data == "profile")
 async def process_profile(callback: types.CallbackQuery):
     user = callback.from_user
@@ -161,46 +182,29 @@ async def process_profile(callback: types.CallbackQuery):
         f"В команде: {days} дн."
     )
 
-    await callback.message.edit_text(
-        text=profile_text, reply_markup=get_back_keyboard()
-    )
+    await edit_msg_with_photo(callback, profile_text, PHOTO_PRO, get_back_keyboard())
     await callback.answer()
 
 
-# Кнопка "Настройки"
+# === РАЗДЕЛ: НАСТРОЙКИ (NAS.png) ===
+
 @dp.callback_query(lambda c: c.data == "settings")
 async def process_settings(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Ранги", callback_data="set_ranks")
-    )
-    builder.add(
-        types.InlineKeyboardButton(
-            text="Выплаты", callback_data="set_payments"
-        )
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Режим", callback_data="set_mode")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
-    )
+    builder.add(types.InlineKeyboardButton(text="Ранги", callback_data="set_ranks"))
+    builder.add(types.InlineKeyboardButton(text="Выплаты", callback_data="set_payments"))
+    builder.add(types.InlineKeyboardButton(text="Режим", callback_data="set_mode"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
     builder.adjust(1)
 
-    await callback.message.edit_text(
-        text="⚙️ Выбери нужный пункт настройки:",
-        reply_markup=builder.as_markup(),
-    )
+    await edit_msg_with_photo(callback, "⚙️ Выбери нужный пункт настройки:", PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# Кнопка "Ранги" внутри Настроек
 @dp.callback_query(lambda c: c.data == "set_ranks")
 async def process_ranks(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="settings")
-    )
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="settings"))
 
     ranks_text = (
         "💰 Твоя касса: 0$\n\n"
@@ -211,30 +215,17 @@ async def process_ranks(callback: types.CallbackQuery):
         "• Босс — от 10 000$"
     )
 
-    await callback.message.edit_text(
-        text=ranks_text, reply_markup=builder.as_markup()
-    )
+    await edit_msg_with_photo(callback, ranks_text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# Кнопка "Выплаты" внутри Настроек
 @dp.callback_query(lambda c: c.data == "set_payments")
 async def process_payments(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(
-            text="CryptoBot", callback_data="pay_cryptobot"
-        )
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="TRC-20", callback_data="pay_trc20")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="BEP-20", callback_data="pay_bep20")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="settings")
-    )
+    builder.add(types.InlineKeyboardButton(text="CryptoBot", callback_data="pay_cryptobot"))
+    builder.add(types.InlineKeyboardButton(text="TRC-20", callback_data="pay_trc20"))
+    builder.add(types.InlineKeyboardButton(text="BEP-20", callback_data="pay_bep20"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="settings"))
     builder.adjust(1)
 
     payments_text = (
@@ -243,81 +234,34 @@ async def process_payments(callback: types.CallbackQuery):
         "— Выберите метод выплаты:"
     )
 
-    await callback.message.edit_text(
-        text=payments_text, reply_markup=builder.as_markup()
-    )
+    await edit_msg_with_photo(callback, payments_text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# Кнопка "CryptoBot" внутри Выплат
-@dp.callback_query(lambda c: c.data == "pay_cryptobot")
-async def process_cryptobot(callback: types.CallbackQuery):
+@dp.callback_query(lambda c: c.data in ["pay_cryptobot", "pay_trc20", "pay_bep20"])
+async def process_payment_submodes(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
-    )
-
-    cryptobot_text = (
-        "⚡️ Вы выбрали способ: CryptoBot\n\n"
-        "После профита вам придет чек для активации."
-    )
-
-    await callback.message.edit_text(
-        text=cryptobot_text, reply_markup=builder.as_markup()
-    )
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="set_payments"))
+    
+    texts = {
+        "pay_cryptobot": "⚡️ Вы выбрали способ: CryptoBot\n\nПосле профита вам придет чек для активации.",
+        "pay_trc20": "ℹ️ Отправьте ваш адрес в сети TRC-20:",
+        "pay_bep20": "ℹ️ Отправьте ваш адрес в сети BEP-20:"
+    }
+    
+    await edit_msg_with_photo(callback, texts[callback.data], PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# Кнопка "TRC-20" внутри Выплат
-@dp.callback_query(lambda c: c.data == "pay_trc20")
-async def process_trc20(callback: types.CallbackQuery):
-    builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
-    )
-
-    trc20_text = "ℹ️ Отправьте ваш адрес в сети TRC-20:"
-
-    await callback.message.edit_text(
-        text=trc20_text, reply_markup=builder.as_markup()
-    )
-    await callback.answer()
-
-
-# Кнопка "BEP-20" внутри Выплат
-@dp.callback_query(lambda c: c.data == "pay_bep20")
-async def process_bep20(callback: types.CallbackQuery):
-    builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="set_payments")
-    )
-
-    bep20_text = "ℹ️ Отправьте ваш адрес в сети BEP-20:"
-
-    await callback.message.edit_text(
-        text=bep20_text, reply_markup=builder.as_markup()
-    )
-    await callback.answer()
-
-
-# Кнопка "Режим" внутри Настроек
 @dp.callback_query(lambda c: c.data == "set_mode")
 async def process_mode_menu(callback: types.CallbackQuery):
     current_mode = get_user_mode(callback.from_user.id)
 
     builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="От 11", callback_data="mode_iphone_11")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="От 12", callback_data="mode_iphone_12")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="От 13", callback_data="mode_iphone_13")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="settings")
-    )
+    builder.add(types.InlineKeyboardButton(text="От 11", callback_data="mode_iphone_11"))
+    builder.add(types.InlineKeyboardButton(text="От 12", callback_data="mode_iphone_12"))
+    builder.add(types.InlineKeyboardButton(text="От 13", callback_data="mode_iphone_13"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="settings"))
     builder.adjust(1)
 
     mode_text = (
@@ -325,13 +269,10 @@ async def process_mode_menu(callback: types.CallbackQuery):
         f"Локаются все устройства от выбранной модели и выше."
     )
 
-    await callback.message.edit_text(
-        text=mode_text, reply_markup=builder.as_markup()
-    )
+    await edit_msg_with_photo(callback, mode_text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# Обработчик переключения режимов
 @dp.callback_query(lambda c: c.data.startswith("mode_iphone_"))
 async def process_change_mode(callback: types.CallbackQuery):
     model_num = callback.data.split("_")[2]
@@ -342,28 +283,14 @@ async def process_change_mode(callback: types.CallbackQuery):
     await process_mode_menu(callback)
 
 
-# Кнопка "О проекте" в Главном Меню
+# === РАЗДЕЛ: О ПРОЕКТЕ (OPR.png) ===
+
 @dp.callback_query(lambda c: c.data == "about")
 async def process_about_project(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-
-    # Ссылочные кнопки (измените ссылки на свои каналы/чаты)
-    builder.add(
-        types.InlineKeyboardButton(
-            text="Мануал", url="https://t.me/UDD_man"
-        )
-    )
-    builder.add(
-        types.InlineKeyboardButton(
-            text="Болталка", url="https://t.me/+_4Z8Ri03Yw4yNzVi"
-        )
-    )
-    # Кнопка возврата в главное меню
-    builder.add(
-        types.InlineKeyboardButton(text="Назад", callback_data="back_to_main")
-    )
-
-    # Структура: Мануал и Болталка в один ряд, Назад — снизу
+    builder.add(types.InlineKeyboardButton(text="Мануал", url="https://t.me/UDD_man"))
+    builder.add(types.InlineKeyboardButton(text="Болталка", url="https://t.me/+_4Z8Ri03Yw4yNzVi"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
     builder.adjust(2, 1)
 
     about_text = (
@@ -376,18 +303,7 @@ async def process_about_project(callback: types.CallbackQuery):
         "Ворк"
     )
 
-    await callback.message.edit_text(
-        text=about_text, reply_markup=builder.as_markup()
-    )
-    await callback.answer()
-
-
-# Кнопка "Назад" (возврат в главное меню)
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def process_back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        text="👋 Добро пожаловать!", reply_markup=get_main_keyboard()
-    )
+    await edit_msg_with_photo(callback, about_text, PHOTO_OPR, builder.as_markup())
     await callback.answer()
 
 
