@@ -415,8 +415,8 @@ async def process_change_mode(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "about")
 async def process_about_project(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Мануал", url="https://t.me/UDD_man"))
-    builder.add(types.InlineKeyboardButton(text="Болталка", url="https://t.me/+_4Z8Ri03Yw4yNzVi"))
+    builder.add(types.InlineKeyboardButton(text="Мануал", url="https://t.me/+FMJ24Mi9lXtjNWYy"))
+    builder.add(types.InlineKeyboardButton(text="Болталка", url="https://t.me/+3lifdiP9CnQ2Njcy"))
     builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
     builder.adjust(2, 1)
 
