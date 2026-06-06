@@ -52,7 +52,7 @@ def register_user(user_id: int):
         db[uid_str] = {
             "reg_date": datetime.now().strftime("%Y-%m-%d"),
             "mode": "от iPhone 13",
-            "payment_method": "CryptoBot"  # Метод по умолчанию
+            "payment_method": "CryptoBot"
         }
         save_db(db)
 
@@ -84,7 +84,6 @@ def update_user_mode(user_id: int, new_mode: str):
         save_db(db)
 
 
-# Получение текущего метода выплат пользователя
 def get_user_payment_method(user_id: int) -> str:
     db = load_db()
     uid_str = str(user_id)
@@ -93,7 +92,6 @@ def get_user_payment_method(user_id: int) -> str:
     return "CryptoBot"
 
 
-# Обновление метода выплат пользователя
 def update_user_payment_method(user_id: int, new_method: str):
     db = load_db()
     uid_str = str(user_id)
@@ -119,7 +117,6 @@ def get_back_keyboard():
     return builder.as_markup()
 
 
-# Клавиатура выбора методов выплат (вынесена в функцию для повторного использования)
 def get_payments_keyboard():
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="CryptoBot", callback_data="pay_cryptobot"))
@@ -203,10 +200,25 @@ async def process_directions_subsections(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(lambda c: c.data in ["create_mirror", "manage_prices"])
+# ОБРАБОТЧИК КНОПКИ "Создать зеркало"
+@dp.callback_query(lambda c: c.data == "create_mirror")
+async def process_create_mirror(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    # Ссылка открывается в самом приложении Telegram
+    builder.add(types.InlineKeyboardButton(text="Написать оператору", url="https://t.me/udvhw"))
+    # Кнопка возврата в подраздел Fake Нарко (передаем callback 'Narko')
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="Narko"))
+    builder.adjust(1)  # Кнопки по одной в ряд
+
+    text = "Для создания зеркала напишите оператору."
+    await edit_msg_with_photo(callback, text, PHOTO_NAP, builder.as_markup())
+    await callback.answer()
+
+
+# ОБРАБОТЧИК ДЛЯ ОСТАЛЬНЫХ ФУНКЦИЙ НАПРАВЛЕНИЯ
+@dp.callback_query(lambda c: c.data == "manage_prices")
 async def process_narko_features(callback: types.CallbackQuery):
-    action = "Создание зеркала" if callback.data == "create_mirror" else "Управление ценами"
-    await callback.answer(f"Вы открыли: {action} (раздел в разработке)", show_alert=True)
+    await callback.answer("Вы открыли: Управление ценами (раздел в разработке)", show_alert=True)
 
 
 # === РАЗДЕЛ: ПРОФИЛЬ (PRO.png) ===
@@ -269,24 +281,21 @@ async def process_ranks(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# Главное окно раздела "Выплаты"
 @dp.callback_query(lambda c: c.data == "set_payments")
 async def process_payments(callback: types.CallbackQuery):
     current_method = get_user_payment_method(callback.from_user.id)
     
     payments_text = (
         "💳 Настройка выплат:\n\n"
-        f"• Текущий метод выплат: {current_method}\n\n"  # Динамически подставляем метод
+        f"• Текущий метод выплат: {current_method}\n\n"
         "— Выберите метод выплаты:"
     )
     await edit_msg_with_photo(callback, payments_text, PHOTO_NAS, get_payments_keyboard())
     await callback.answer()
 
 
-# Кнопка "CryptoBot" внутри Выплат
 @dp.callback_query(lambda c: c.data == "pay_cryptobot")
 async def process_cryptobot(callback: types.CallbackQuery):
-    # Сразу обновляем текущий метод в БД на CryptoBot
     update_user_payment_method(callback.from_user.id, "CryptoBot")
     
     builder = InlineKeyboardBuilder()
@@ -300,7 +309,6 @@ async def process_cryptobot(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# Кнопки "TRC-20" или "BEP-20" внутри Выплат
 @dp.callback_query(lambda c: c.data in ["pay_trc20", "pay_bep20"])
 async def process_crypto_address_request(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
@@ -310,21 +318,18 @@ async def process_crypto_address_request(callback: types.CallbackQuery, state: F
     text = f"ℹ️ Отправьте ваш адрес в сети {network}:"
     
     await state.set_state(PaymentStates.waiting_for_address)
-    # Сохраняем в память выбранную сеть и ID сообщения с меню
     await state.update_data(menu_msg_id=callback.message.message_id, chosen_network=network)
     
     await edit_msg_with_photo(callback, text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
 
 
-# ОБРАБОТЧИК ЛЮБОГО ТЕКСТА ОТ ПОЛЬЗОВАТЕЛЯ, КОГДА БОТ ОЖИДАЕТ АДРЕС КРИПТЫ
 @dp.message(PaymentStates.waiting_for_address, F.text)
 async def process_received_address(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     menu_msg_id = user_data.get("menu_msg_id")
-    chosen_network = user_data.get("chosen_network")  # "TRC-20" или "BEP-20"
+    chosen_network = user_data.get("chosen_network")
     
-    # Теперь, когда адрес успешно прислан, меняем метод выплат пользователя в базе данных
     update_user_payment_method(message.from_user.id, chosen_network)
     
     info_msg = await message.answer(
@@ -344,7 +349,6 @@ async def process_received_address(message: types.Message, state: FSMContext):
     except Exception as e:
         logging.error(f"Не удалось удалить сообщение пользователя: {e}")
 
-    # Заново формируем текст меню выплат, где отобразится уже новый измененный метод
     current_method = get_user_payment_method(message.from_user.id)
     payments_text = (
         "💳 Настройка выплат:\n\n"
@@ -420,7 +424,7 @@ async def process_about_project(callback: types.CallbackQuery):
         "ℹ️ ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
         "🚀 Мы работаем с 01.03.2026, за это время сделаны 92 профитов на сумму 6,264 $\n\n"
         "💸 Выплаты\n"
-        "┠ Пнямой перевод - 85%\n"
+        "┠ Прямой перевод - 85%\n"
         "┖ Сервисы - 75%\n\n"
         "⚡️ Состояние работы бота:\n"
         "Ворк"
