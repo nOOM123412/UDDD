@@ -3,11 +3,13 @@ from datetime import datetime
 import json
 import logging
 import os
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-# Добавляем необходимый класс для смены медиафайлов
 from aiogram.types import InputMediaPhoto, FSInputFile
+# Импортируем модули для работы с состояниями (FSM)
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
 TOKEN = "8894192971:AAEVa2hU7kC4DhatsMHnFfhT5NS4gT8tk4U"
 DB_FILE = "users_db.json"
@@ -18,11 +20,16 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- Пути к вашим фотографиям ---
-PHOTO_MAIN = "MM.jpeg"
-PHOTO_NAP = "NAP.jpeg"
-PHOTO_PRO = "PRO.jpeg"
-PHOTO_NAS = "NAS.jpeg"
-PHOTO_OPR = "OPR.jpeg"
+PHOTO_MAIN = "MM.png"
+PHOTO_NAP = "NAP.png"
+PHOTO_PRO = "PRO.png"
+PHOTO_NAS = "NAS.png"
+PHOTO_OPR = "OPR.png"
+
+
+# --- Определение состояний FSM ---
+class PaymentStates(StatesGroup):
+    waiting_for_address = State()  # Состояние ожидания адреса кошелька
 
 
 # --- База данных на JSON ---
@@ -93,6 +100,17 @@ def get_back_keyboard():
     return builder.as_markup()
 
 
+# Клавиатура выбора методов выплат (вынесена в функцию для повторного использования)
+def get_payments_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="CryptoBot", callback_data="pay_cryptobot"))
+    builder.add(types.InlineKeyboardButton(text="TRC-20", callback_data="pay_trc20"))
+    builder.add(types.InlineKeyboardButton(text="BEP-20", callback_data="pay_bep20"))
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="settings"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 # --- Вспомогательная функция для плавного редактирования фото и текста ---
 async def edit_msg_with_photo(callback: types.CallbackQuery, text: str, photo_path: str, reply_markup):
     """Обновляет картинку и текст в одном сообщении без его удаления"""
@@ -100,12 +118,10 @@ async def edit_msg_with_photo(callback: types.CallbackQuery, text: str, photo_pa
         media = InputMediaPhoto(media=FSInputFile(photo_path), caption=text)
         await callback.message.edit_media(media=media, reply_markup=reply_markup)
     else:
-        # Если вдруг файла нет, бот просто отредактирует текст, чтобы не падать с ошибкой
         logging.warning(f"Файл {photo_path} не найден! Отправлен только текст.")
         try:
             await callback.message.edit_text(text=text, reply_markup=reply_markup)
         except Exception:
-            # Если старое сообщение было с фото, edit_text вызовет ошибку, тогда шлем новое
             await callback.message.answer_photo(photo=FSInputFile(photo_path) if os.path.exists(photo_path) else None, caption=text, reply_markup=reply_markup)
 
 
@@ -117,7 +133,6 @@ async def cmd_start(message: types.Message):
     register_user(message.from_user.id)
     await message.answer(text="В связи с набором состава, модерация заявок временно отключена!")
     
-    # Главное меню присылаем с фоткой MM.png через answer_photo
     if os.path.exists(PHOTO_MAIN):
         await message.answer_photo(
             photo=FSInputFile(PHOTO_MAIN),
@@ -149,14 +164,30 @@ async def process_get_apple_id(callback: types.CallbackQuery):
     await callback.answer()
 
 
+# ОБРАБОТЧИК ДЛЯ НАЖАТИЯ НА КНОПКУ "Fake Н@pko" И "iCloud"
 @dp.callback_query(lambda c: c.data in ["Narko", "iCloud"])
 async def process_directions_subsections(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="get_apple_id"))
     
-    text = f"Вы выбрали направление: {callback.data}. Тут пока пусто."
+    if callback.data == "Narko":
+        text = "Мануал и инструкцию к данному направлению вы можете найти в разделе главного меню \"О проекте\""
+        builder.add(types.InlineKeyboardButton(text="Создать зеркало", callback_data="create_mirror"))
+        builder.add(types.InlineKeyboardButton(text="Управление ценами", callback_data="manage_prices"))
+        builder.add(types.InlineKeyboardButton(text="Назад", callback_data="get_apple_id"))
+        builder.adjust(1)
+    else:
+        text = "Вы выбрали направление: iCloud. Тут пока пусто."
+        builder.add(types.InlineKeyboardButton(text="Назад", callback_data="get_apple_id"))
+        builder.adjust(1)
+    
     await edit_msg_with_photo(callback, text, PHOTO_NAP, builder.as_markup())
     await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data in ["create_mirror", "manage_prices"])
+async def process_narko_features(callback: types.CallbackQuery):
+    action = "Создание зеркала" if callback.data == "create_mirror" else "Управление ценами"
+    await callback.answer(f"Вы открыли: {action} (раздел в разработке)", show_alert=True)
 
 
 # === РАЗДЕЛ: ПРОФИЛЬ (PRO.png) ===
@@ -221,36 +252,111 @@ async def process_ranks(callback: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "set_payments")
 async def process_payments(callback: types.CallbackQuery):
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="CryptoBot", callback_data="pay_cryptobot"))
-    builder.add(types.InlineKeyboardButton(text="TRC-20", callback_data="pay_trc20"))
-    builder.add(types.InlineKeyboardButton(text="BEP-20", callback_data="pay_bep20"))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="settings"))
-    builder.adjust(1)
-
     payments_text = (
         "💳 Настройка выплат:\n\n"
         "• Текущий метод выплат: CryptoBot\n\n"
         "— Выберите метод выплаты:"
     )
-
-    await edit_msg_with_photo(callback, payments_text, PHOTO_NAS, builder.as_markup())
+    await edit_msg_with_photo(callback, payments_text, PHOTO_NAS, get_payments_keyboard())
     await callback.answer()
 
 
-@dp.callback_query(lambda c: c.data in ["pay_cryptobot", "pay_trc20", "pay_bep20"])
-async def process_payment_submodes(callback: types.CallbackQuery):
+# Кнопка "CryptoBot" внутри Выплат
+@dp.callback_query(lambda c: c.data == "pay_cryptobot")
+async def process_cryptobot(callback: types.CallbackQuery):
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="set_payments"))
+
+    cryptobot_text = (
+        "⚡️ Вы выбрали способ: CryptoBot\n\n"
+        "После профита вам придет чек для активации."
+    )
+    await edit_msg_with_photo(callback, cryptobot_text, PHOTO_NAS, builder.as_markup())
+    await callback.answer()
+
+
+# Кнопки "TRC-20" или "BEP-20" внутри Выплат
+@dp.callback_query(lambda c: c.data in ["pay_trc20", "pay_bep20"])
+async def process_crypto_address_request(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Назад", callback_data="set_payments"))
     
-    texts = {
-        "pay_cryptobot": "⚡️ Вы выбрали способ: CryptoBot\n\nПосле профита вам придет чек для активации.",
-        "pay_trc20": "ℹ️ Отправьте ваш адрес в сети TRC-20:",
-        "pay_bep20": "ℹ️ Отправьте ваш адрес в сети BEP-20:"
-    }
+    # Определяем сеть для текста
+    network = "TRC-20" if callback.data == "pay_trc20" else "BEP-20"
+    text = f"ℹ️ Отправьте ваш адрес в сети {network}:"
     
-    await edit_msg_with_photo(callback, texts[callback.data], PHOTO_NAS, builder.as_markup())
+    # Включаем для пользователя режим ожидания ввода текста (FSM)
+    await state.set_state(PaymentStates.waiting_for_address)
+    # Сохраняем в контекст ID сообщения с инлайн-меню, чтобы потом вернуться к нему
+    await state.update_data(menu_msg_id=callback.message.message_id)
+    
+    await edit_msg_with_photo(callback, text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
+
+
+# ОБРАБОТЧИК ЛЮБОГО ТЕКСТА ОТ ПОЛЬЗОВАТЕЛЯ, КОГДА БОТ ОЖИДАЕТ АДРЕС КРИПТЫ
+@dp.message(PaymentStates.waiting_for_address, F.text)
+async def process_received_address(message: types.Message, state: FSMContext):
+    # (Опционально) Здесь вы можете сохранить адрес message.text в базу данных JSON
+    
+    # Отправляем сообщение о принятии адреса
+    info_msg = await message.answer(
+        text="Ваш адрес принят! Дальнейшие выплаты будут происходить на него."
+    )
+    
+    # Извлекаем сохраненный ID старого сообщения меню выплат
+    user_data = await state.get_data()
+    menu_msg_id = user_data.get("menu_msg_id")
+    
+    # Сбрасываем состояние ожидания (выключаем FSM)
+    await state.clear()
+    
+    # Ждем ровно 2 секунды
+    await asyncio.sleep(2)
+    
+    # Удаляем сообщение о принятии адреса
+    try:
+        await info_msg.delete()
+    except Exception as e:
+        logging.error(f"Не удалось удалить сообщение: {e}")
+        
+    # Удаляем сообщение самого пользователя с адресом для чистоты чата
+    try:
+        await message.delete()
+    except Exception as e:
+        logging.error(f"Не удалось удалить сообщение пользователя: {e}")
+
+    # Возвращаем пользователя обратно в окно выбора метода выплат
+    payments_text = (
+        "💳 Настройка выплат:\n\n"
+        "• Текущий метод выплат: CryptoBot\n\n"
+        "— Выберите метод выплаты:"
+    )
+    
+    # Обновляем старое меню (редактируем его обратно к выбору выплат)
+    try:
+        if os.path.exists(PHOTO_NAS):
+            media = InputMediaPhoto(media=FSInputFile(PHOTO_NAS), caption=payments_text)
+            await bot.edit_message_media(
+                chat_id=message.chat.id,
+                message_id=menu_msg_id,
+                media=media,
+                reply_markup=get_payments_keyboard()
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=menu_msg_id,
+                text=payments_text,
+                reply_markup=get_payments_keyboard()
+            )
+    except Exception as e:
+        # Если старое сообщение потеряно, просто отправляем новое меню с фото
+        logging.warning(f"Не удалось отредактировать старое меню выплат: {e}. Отправляем новое.")
+        if os.path.exists(PHOTO_NAS):
+            await message.answer_photo(photo=FSInputFile(PHOTO_NAS), caption=payments_text, reply_markup=get_payments_keyboard())
+        else:
+            await message.answer(text=payments_text, reply_markup=get_payments_keyboard())
 
 
 @dp.callback_query(lambda c: c.data == "set_mode")
@@ -299,7 +405,8 @@ async def process_about_project(callback: types.CallbackQuery):
         "💸 Выплаты\n"
         "┠ Прямой перевод - 85%\n"
         "┖ Сервисы - 75%\n\n"
-        "⚡️ Состояние работы бота: Ворк"
+        "⚡️ Состояние работы бота:\n"
+        "Ворк"
     )
 
     await edit_msg_with_photo(callback, about_text, PHOTO_OPR, builder.as_markup())
