@@ -52,6 +52,7 @@ def register_user(user_id: int):
         db[uid_str] = {
             "reg_date": datetime.now().strftime("%Y-%m-%d"),
             "mode": "от iPhone 13",
+            "payment_method": "CryptoBot"  # Метод по умолчанию
         }
         save_db(db)
 
@@ -80,6 +81,24 @@ def update_user_mode(user_id: int, new_mode: str):
     uid_str = str(user_id)
     if uid_str in db:
         db[uid_str]["mode"] = new_mode
+        save_db(db)
+
+
+# Получение текущего метода выплат пользователя
+def get_user_payment_method(user_id: int) -> str:
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str in db and "payment_method" in db[uid_str]:
+        return db[uid_str]["payment_method"]
+    return "CryptoBot"
+
+
+# Обновление метода выплат пользователя
+def update_user_payment_method(user_id: int, new_method: str):
+    db = load_db()
+    uid_str = str(user_id)
+    if uid_str in db:
+        db[uid_str]["payment_method"] = new_method
         save_db(db)
 
 
@@ -250,11 +269,14 @@ async def process_ranks(callback: types.CallbackQuery):
     await callback.answer()
 
 
+# Главное окно раздела "Выплаты"
 @dp.callback_query(lambda c: c.data == "set_payments")
 async def process_payments(callback: types.CallbackQuery):
+    current_method = get_user_payment_method(callback.from_user.id)
+    
     payments_text = (
         "💳 Настройка выплат:\n\n"
-        "• Текущий метод выплат: CryptoBot\n\n"
+        f"• Текущий метод выплат: {current_method}\n\n"  # Динамически подставляем метод
         "— Выберите метод выплаты:"
     )
     await edit_msg_with_photo(callback, payments_text, PHOTO_NAS, get_payments_keyboard())
@@ -264,6 +286,9 @@ async def process_payments(callback: types.CallbackQuery):
 # Кнопка "CryptoBot" внутри Выплат
 @dp.callback_query(lambda c: c.data == "pay_cryptobot")
 async def process_cryptobot(callback: types.CallbackQuery):
+    # Сразу обновляем текущий метод в БД на CryptoBot
+    update_user_payment_method(callback.from_user.id, "CryptoBot")
+    
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Назад", callback_data="set_payments"))
 
@@ -281,14 +306,12 @@ async def process_crypto_address_request(callback: types.CallbackQuery, state: F
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Назад", callback_data="set_payments"))
     
-    # Определяем сеть для текста
     network = "TRC-20" if callback.data == "pay_trc20" else "BEP-20"
     text = f"ℹ️ Отправьте ваш адрес в сети {network}:"
     
-    # Включаем для пользователя режим ожидания ввода текста (FSM)
     await state.set_state(PaymentStates.waiting_for_address)
-    # Сохраняем в контекст ID сообщения с инлайн-меню, чтобы потом вернуться к нему
-    await state.update_data(menu_msg_id=callback.message.message_id)
+    # Сохраняем в память выбранную сеть и ID сообщения с меню
+    await state.update_data(menu_msg_id=callback.message.message_id, chosen_network=network)
     
     await edit_msg_with_photo(callback, text, PHOTO_NAS, builder.as_markup())
     await callback.answer()
@@ -297,43 +320,38 @@ async def process_crypto_address_request(callback: types.CallbackQuery, state: F
 # ОБРАБОТЧИК ЛЮБОГО ТЕКСТА ОТ ПОЛЬЗОВАТЕЛЯ, КОГДА БОТ ОЖИДАЕТ АДРЕС КРИПТЫ
 @dp.message(PaymentStates.waiting_for_address, F.text)
 async def process_received_address(message: types.Message, state: FSMContext):
-    # (Опционально) Здесь вы можете сохранить адрес message.text в базу данных JSON
+    user_data = await state.get_data()
+    menu_msg_id = user_data.get("menu_msg_id")
+    chosen_network = user_data.get("chosen_network")  # "TRC-20" или "BEP-20"
     
-    # Отправляем сообщение о принятии адреса
+    # Теперь, когда адрес успешно прислан, меняем метод выплат пользователя в базе данных
+    update_user_payment_method(message.from_user.id, chosen_network)
+    
     info_msg = await message.answer(
         text="Ваш адрес принят! Дальнейшие выплаты будут происходить на него."
     )
     
-    # Извлекаем сохраненный ID старого сообщения меню выплат
-    user_data = await state.get_data()
-    menu_msg_id = user_data.get("menu_msg_id")
-    
-    # Сбрасываем состояние ожидания (выключаем FSM)
     await state.clear()
-    
-    # Ждем ровно 2 секунды
     await asyncio.sleep(2)
     
-    # Удаляем сообщение о принятии адреса
     try:
         await info_msg.delete()
     except Exception as e:
         logging.error(f"Не удалось удалить сообщение: {e}")
         
-    # Удаляем сообщение самого пользователя с адресом для чистоты чата
     try:
         await message.delete()
     except Exception as e:
         logging.error(f"Не удалось удалить сообщение пользователя: {e}")
 
-    # Возвращаем пользователя обратно в окно выбора метода выплат
+    # Заново формируем текст меню выплат, где отобразится уже новый измененный метод
+    current_method = get_user_payment_method(message.from_user.id)
     payments_text = (
         "💳 Настройка выплат:\n\n"
-        "• Текущий метод выплат: CryptoBot\n\n"
+        f"• Текущий метод выплат: {current_method}\n\n"
         "— Выберите метод выплаты:"
     )
     
-    # Обновляем старое меню (редактируем его обратно к выбору выплат)
     try:
         if os.path.exists(PHOTO_NAS):
             media = InputMediaPhoto(media=FSInputFile(PHOTO_NAS), caption=payments_text)
@@ -351,8 +369,7 @@ async def process_received_address(message: types.Message, state: FSMContext):
                 reply_markup=get_payments_keyboard()
             )
     except Exception as e:
-        # Если старое сообщение потеряно, просто отправляем новое меню с фото
-        logging.warning(f"Не удалось отредактировать старое меню выплат: {e}. Отправляем новое.")
+        logging.warning(f"Не удалось отредактировать меню выплат: {e}. Отправляем новое.")
         if os.path.exists(PHOTO_NAS):
             await message.answer_photo(photo=FSInputFile(PHOTO_NAS), caption=payments_text, reply_markup=get_payments_keyboard())
         else:
@@ -403,7 +420,7 @@ async def process_about_project(callback: types.CallbackQuery):
         "ℹ️ ИНФОРМАЦИЯ О ПРОЕКТЕ UDD TEAM\n\n"
         "🚀 Мы работаем с 01.03.2026, за это время сделаны 92 профитов на сумму 6,264 $\n\n"
         "💸 Выплаты\n"
-        "┠ Прямой перевод - 85%\n"
+        "┠ Пнямой перевод - 85%\n"
         "┖ Сервисы - 75%\n\n"
         "⚡️ Состояние работы бота:\n"
         "Ворк"
